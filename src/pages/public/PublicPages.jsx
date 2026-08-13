@@ -66,7 +66,7 @@ export const LandingPage = ({ navigate }) => {
                 Uncapped indemnities override statutory damages limits under Sec 73 of Indian Contract Act 1872. High risk of consequential liability identified.
               </p>
               <div className="pt-3 border-t flex justify-end" style={{ borderColor: 'var(--color-primary-border)' }}>
-                <Button size="sm" onClick={() => navigate('/auth/signup')}>
+                <Button size="sm" onClick={() => navigate('/app/marketplace')}>
                   Get Reviewed by Advocate <ArrowRight size={14} />
                 </Button>
               </div>

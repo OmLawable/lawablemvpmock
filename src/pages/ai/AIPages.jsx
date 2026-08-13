@@ -133,7 +133,7 @@ export const AIChatPage = ({ navigate, conversationId }) => {
                   )}
                 </div>
 
-                {/* AI Escalation Hook Banner Redesign (20px 24px Padding, Rounded 12px, Spacious) */}
+                {/* AI Escalation Hook Banner -> Navigates to /app/marketplace */}
                 {m.sender === 'ai' && m.escalationRecommended && (
                   <div
                     className="mt-6 p-6 border rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6"
@@ -156,7 +156,7 @@ export const AIChatPage = ({ navigate, conversationId }) => {
                     <Button
                       size="md"
                       variant="danger"
-                      onClick={() => navigate(`/app/marketplace/request/new?source=ai_escalation&sourceRefId=${activeConv.id}`)}
+                      onClick={() => navigate('/app/marketplace')}
                       style={{ whiteSpace: 'nowrap' }}
                     >
                       Get Reviewed by Advocate <ArrowRight size={14} />
