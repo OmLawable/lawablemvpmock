@@ -49,14 +49,21 @@ import {
 export function App() {
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
   const [searchParams, setSearchParams] = useState(new URLSearchParams(window.location.search));
+  const [storeState, setStoreState] = useState(store.getState());
 
   useEffect(() => {
+    const unsubscribe = store.subscribe((newState) => {
+      setStoreState({ ...newState });
+    });
     const handlePopState = () => {
       setCurrentPath(window.location.pathname);
       setSearchParams(new URLSearchParams(window.location.search));
     };
     window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    return () => {
+      unsubscribe();
+      window.removeEventListener('popstate', handlePopState);
+    };
   }, []);
 
   const navigate = (path) => {

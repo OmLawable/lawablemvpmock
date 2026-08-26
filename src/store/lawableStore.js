@@ -1,10 +1,37 @@
 import { INITIAL_DATA } from './initialData';
+import { auth } from '../config/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { getUserProfile } from '../services/firebaseService';
+import { seedInitialDataToFirestore } from '../services/seedFirebase';
 
 class LawableStore {
   constructor() {
     this.toasts = [];
     this.listeners = new Set();
     this.loadState();
+    this.initFirebase();
+  }
+
+  initFirebase() {
+    // Background seed of initial mock data into Firestore if empty
+    seedInitialDataToFirestore().catch((err) => console.warn('Seeding check:', err.message));
+
+    // Firebase Auth session synchronization
+    onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        let profile = await getUserProfile(firebaseUser.uid);
+        this.state.currentUser = {
+          ...this.state.currentUser,
+          id: firebaseUser.uid,
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          name: firebaseUser.displayName || (profile && profile.name) || firebaseUser.email.split('@')[0],
+          role: (profile && profile.role) || this.state.currentUser.role || 'client',
+          emailVerified: firebaseUser.emailVerified
+        };
+        this.notify();
+      }
+    });
   }
 
   loadState() {

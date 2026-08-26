@@ -1,15 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Shield, Users, Clock, CheckSquare, Sparkles, BookOpen, FileText, AlertTriangle, 
-  Search, Eye, Check, X, Lock, RefreshCw, ChevronRight, HelpCircle
+  Search, Eye, Check, X, Lock, RefreshCw, ChevronRight, HelpCircle, Database
 } from 'lucide-react';
 import { Card, Button, Badge, SearchInput, Modal } from '../../components/common/UIComponents';
 import { store } from '../../store/lawableStore';
+import { seedInitialDataToFirestore } from '../../services/seedFirebase';
 
 // SCREEN 50 to 65 — SINGLE OPERATIONAL ADMIN PANEL (32px PADDING, 24px GAP)
 export const AdminOpsDashboardPage = ({ navigate, activeTab = 'overview' }) => {
   const [state, setState] = useState(store.getState());
+  const [seeding, setSeeding] = useState(false);
   useEffect(() => store.subscribe(setState), []);
+
+  const handleManualSeed = async () => {
+    setSeeding(true);
+    store.addToast('Attempting to seed Firestore database...', 'info');
+    const res = await seedInitialDataToFirestore();
+    setSeeding(false);
+
+    if (res.success) {
+      store.addToast('Firestore database seeded successfully!', 'success');
+    } else {
+      store.addToast(`Firestore Permission Error: ${res.error}. Please update Firestore Security Rules in Firebase Console to 'allow read, write: if true;'`, 'danger');
+    }
+  };
 
   const [selectedLawyer, setSelectedLawyer] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
@@ -26,6 +41,10 @@ export const AdminOpsDashboardPage = ({ navigate, activeTab = 'overview' }) => {
           <Badge variant="primary" className="mb-2">Central Admin Ops</Badge>
           <h1 className="h2" style={{ margin: 0 }}>Lawable Operational Administration</h1>
         </div>
+        <Button variant="secondary" onClick={handleManualSeed} disabled={seeding} className="flex items-center gap-2">
+          <Database size={16} />
+          {seeding ? 'Seeding Firestore...' : 'Seed Firestore Database'}
+        </Button>
       </div>
 
       {/* Admin Tabs */}
