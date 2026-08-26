@@ -1,17 +1,6 @@
 // Seed data aligned 100% with Lawable PRD v1.0 specifications
 export const INITIAL_DATA = {
-  currentUser: {
-    id: 'user-001',
-    name: 'Aarav Sharma',
-    email: 'aarav.sharma@example.com',
-    role: 'client', // 'student' | 'client' | 'lawyer' | 'business' | 'admin'
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-    emailVerified: true,
-    onboardingComplete: true,
-    city: 'Mumbai',
-    state: 'Maharashtra',
-    phone: '+91 98765 43210'
-  },
+  currentUser: null,
 
   roles: [
     { id: 'student', title: 'Student', desc: 'Legal education, syllabus & certificates.' },
@@ -446,87 +435,13 @@ export const INITIAL_DATA = {
   ],
 
   // AI Conversations
-  aiConversations: [
-    {
-      id: 'conv-301',
-      userId: 'user-001',
-      title: 'Indemnification & Risk Analysis in Vendor MSA',
-      updatedAt: '2026-08-12T14:30:00Z',
-      riskLevel: 'high',
-      messages: [
-        {
-          id: 'msg-1',
-          sender: 'user',
-          text: 'I uploaded our vendor contract. Does Section 8 uncapped indemnity expose our company to major financial risk under Indian Contract Act?',
-          timestamp: '2026-08-12T14:30:00Z'
-        },
-        {
-          id: 'msg-2',
-          sender: 'ai',
-          text: 'Based on Section 8 of your uploaded document **Vendor_Agreement_Draft_v2.pdf**, the counterparty requires **unlimited indemnification for third-party IP claims and indirect damages**.\n\nUnder Section 73 of the **Indian Contract Act, 1872**, compensation is ordinarily payable for losses that naturally arose in the usual course of things. However, uncapped indemnities override statutory limitations and expose your firm to full consequential liability.',
-          citations: [
-            { source: 'Indian Contract Act 1872', text: 'Sec 73: Compensation for loss or damage caused by breach' },
-            { source: 'Supreme Court Citation', text: 'Pannalal Bharulal v. Union of India (1976)' }
-          ],
-          escalationRecommended: true,
-          timestamp: '2026-08-12T14:30:15Z'
-        }
-      ]
-    }
-  ],
+  aiConversations: [],
 
   // Documents
-  documents: [
-    { id: 'doc-001', title: 'Vendor_Agreement_Draft_v2.pdf', source: 'Uploaded PDF', riskLevel: 'high', uploadDate: '2026-08-12' },
-    { id: 'doc-002', title: 'Mutual_NDA_NexWave_Acme.docx', source: 'Lawable AI Draft', riskLevel: 'low', uploadDate: '2026-08-11' },
-    { id: 'doc-003', title: 'Founders_Vesting_Agreement_Draft.docx', source: 'Lawable AI Draft', riskLevel: 'low', uploadDate: '2026-08-10' }
-  ],
+  documents: [],
 
   // Requests
-  requests: [
-    {
-      id: 'req-9001',
-      clientId: 'user-001',
-      clientName: 'Aarav Sharma',
-      serviceId: 'srv-004',
-      serviceTitle: 'Master Service Agreement (MSA) Legal Review',
-      lawyerId: 'lawyer-103',
-      lawyerName: 'Adv. Vikramaditya Sen',
-      source: 'ai_escalation',
-      sourceRefId: 'conv-301',
-      matterDescription: 'High risk indemnification clause detected during Lawable AI document review. Requesting advocate redline and liability cap limitation advice per Sec 73.',
-      preferredContact: 'In-App Messages',
-      preferredTime: 'Afternoon (2 PM - 5 PM)',
-      fee: 4999,
-      quotedFee: 4999,
-      status: 'in_progress',
-      timeline: [
-        { actor: 'Aarav Sharma (Client)', action: 'submitted', note: 'Request submitted via AI Escalation prompt.', timestamp: '2026-08-10T16:00:00Z' },
-        { actor: 'Adv. Vikramaditya Sen (Lawyer)', action: 'accepted', note: 'Advocate accepted request at quoted fee ₹4,999.', timestamp: '2026-08-10T16:45:00Z' },
-        { actor: 'Adv. Vikramaditya Sen (Lawyer)', action: 'in_progress', note: 'Currently conducting clause-level redline review.', timestamp: '2026-08-11T19:50:00Z' }
-      ]
-    },
-    {
-      id: 'req-9002',
-      clientId: 'user-001',
-      clientName: 'Aarav Sharma',
-      serviceId: 'srv-002',
-      serviceTitle: 'DPDP Act 2023 Privacy Audit & Data Fiduciary Notice',
-      lawyerId: 'lawyer-101',
-      lawyerName: 'Adv. Priya Malhotra',
-      source: 'direct',
-      sourceRefId: null,
-      matterDescription: 'Need DPDP Act 2023 compliance audit for SaaS platform user consent notices and vendor data processing agreements.',
-      preferredContact: 'In-App Messages',
-      preferredTime: 'Morning (10 AM - 1 PM)',
-      fee: 14999,
-      quotedFee: 14999,
-      status: 'submitted',
-      timeline: [
-        { actor: 'Aarav Sharma (Client)', action: 'submitted', note: 'Direct request submitted to Adv. Priya Malhotra.', timestamp: '2026-08-12T11:00:00Z' }
-      ]
-    }
-  ],
+  requests: [],
 
   // Courses
   courses: [
@@ -542,7 +457,7 @@ export const INITIAL_DATA = {
         {
           title: 'Module 1: Essential Contract Structure',
           lessons: [
-            { id: 'les-101', title: '1.1 Recitals, Consideration & Essential Clauses', content: 'Under Section 10 of the Indian Contract Act 1872, all agreements are contracts if made by free consent of parties competent to contract...', completed: true },
+            { id: 'les-101', title: '1.1 Recitals, Consideration & Essential Clauses', content: 'Under Section 10 of the Indian Contract Act 1872, all agreements are contracts if made by free consent of parties competent to contract...', completed: false },
             { id: 'les-102', title: '1.2 Indemnity & Limitation of Liability per Sec 73', content: 'Section 73 governs compensation for breach of contract. Direct vs consequential damages...', completed: false }
           ]
         }
@@ -585,51 +500,19 @@ export const INITIAL_DATA = {
   ],
 
   // Certificates
-  certificates: [
-    {
-      id: 'cert-1',
-      certificateNumber: 'LWB-2026-DRAFT-8X2A91',
-      learnerName: 'Aarav Sharma',
-      courseTitle: 'Practical Contract Drafting under Indian Jurisprudence',
-      score: 92,
-      issueDate: '2026-08-01',
-      verified: true
-    }
-  ],
+  certificates: [],
 
   // Business Profile
-  businessProfile: {
-    companyName: 'NexWave Solutions Pvt Ltd',
-    entityType: 'pvt_ltd',
-    cin: 'U72900MH2024PTC392810',
-    gstin: '27AABCN8912P1ZD',
-    state: 'Maharashtra',
-    city: 'Mumbai',
-    employeeCount: 24,
-    complianceScore: 82
-  },
+  businessProfile: null,
 
   // Compliance Items
-  complianceChecklist: [
-    { id: 'comp-101', title: 'Form MGT-7A Annual MCA Return Filing', area: 'companies_act', dueDate: '2026-10-30', weight: 5, status: 'pending', reference: 'Sec 92 Companies Act 2013' },
-    { id: 'comp-102', title: 'Monthly GSTR-3B Tax Return Filing', area: 'gst', dueDate: '2026-08-20', weight: 4, status: 'completed', reference: 'Sec 39 CGST Act 2017' },
-    { id: 'comp-103', title: 'DPDP Data Principal Consent Notice Audit', area: 'dpdp', dueDate: '2026-08-05', weight: 5, status: 'overdue', reference: 'Sec 6 DPDP Act 2023' },
-    { id: 'comp-104', title: 'Annual POSH ICC Report to District Officer', area: 'labour_law', dueDate: '2026-12-31', weight: 3, status: 'pending', reference: 'Sec 21 POSH Act 2013' }
-  ],
+  complianceChecklist: [],
 
   // Contracts Register
-  contracts: [
-    { id: 'cnt-1', title: 'Office Space Commercial Lease Agreement', counterparty: 'RealTech Estates LLP', value: '₹ 18,00,000 / yr', endDate: '2026-09-01', daysToExpiry: 18, autoRenew: false },
-    { id: 'cnt-2', title: 'Cloud Infrastructure Vendor Master Agreement', counterparty: 'CloudScale Technologies', value: '₹ 6,50,000 / yr', endDate: '2026-11-15', daysToExpiry: 93, autoRenew: true }
-  ],
+  contracts: [],
 
   // Admin Users
-  adminUsers: [
-    { id: 'user-001', name: 'Aarav Sharma', email: 'aarav.sharma@example.com', role: 'client', status: 'active' },
-    { id: 'user-002', name: 'Adv. Priya Malhotra', email: 'priya.malhotra@lawable.in', role: 'lawyer', status: 'active' },
-    { id: 'user-003', name: 'Rohan Mehta', email: 'rohan.student@example.com', role: 'student', status: 'active' },
-    { id: 'user-004', name: 'NexWave Admin', email: 'admin@nexwave.in', role: 'business', status: 'active' }
-  ],
+  adminUsers: [],
 
   // Editorial Blogs
   blogs: [
@@ -656,8 +539,5 @@ export const INITIAL_DATA = {
   ],
 
   // Audit Logs
-  auditLogs: [
-    { id: 'log-1', actor: 'Admin Ops', action: 'VERIFY_LAWYER', entity: 'Lawyer', entityId: 'lawyer-101', timestamp: '2026-08-10T10:00:00Z' },
-    { id: 'log-2', actor: 'Aarav Sharma', action: 'CREATE_REQUEST', entity: 'ServiceRequest', entityId: 'req-9001', timestamp: '2026-08-10T16:00:00Z' }
-  ]
+  auditLogs: []
 };

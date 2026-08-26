@@ -25,7 +25,7 @@ import {
 } from './pages/marketplace/MarketplacePages';
 
 import { 
-  AcademyPage, AcademyQuizPage 
+  AcademyPage, AcademyQuizPage, MyCertificatesPage 
 } from './pages/academy/AcademyPages';
 
 import { 
@@ -77,6 +77,8 @@ export function App() {
   const renderRoute = () => {
     // Strip trailing slash except for root '/'
     const p = (currentPath.length > 1 && currentPath.endsWith('/')) ? currentPath.slice(0, -1) : currentPath;
+    const currentUser = store.getState().currentUser;
+    const activeRole = currentUser?.role || 'student';
 
     // PUBLIC MARKETING & DIRECTORY ROUTES
     if (p === '/') return <PublicShell navigate={navigate} currentRoute={p}><LandingPage navigate={navigate} /></PublicShell>;
@@ -102,11 +104,10 @@ export function App() {
 
     // ROLE-SPECIFIC DASHBOARD FOR /app (PRD §6.1 FR-1.7)
     if (p === '/app') {
-      const activeRole = store.getState().currentUser?.role || 'client';
       if (activeRole === 'student') return <AppShell navigate={navigate} currentRoute="/app"><StudentDashboardPage navigate={navigate} /></AppShell>;
       if (activeRole === 'lawyer') return <AppShell navigate={navigate} currentRoute="/app/lawyer"><LawyerDashboardPage navigate={navigate} /></AppShell>;
       if (activeRole === 'business') return <AppShell navigate={navigate} currentRoute="/app/business"><BusinessDashboardPage navigate={navigate} /></AppShell>;
-      if (activeRole === 'admin') return <AdminOpsDashboardPage navigate={navigate} activeTab="overview" />;
+      if (activeRole === 'admin') return <AppShell navigate={navigate} currentRoute="/admin"><AdminOpsDashboardPage navigate={navigate} activeTab="overview" /></AppShell>;
       return <AppShell navigate={navigate} currentRoute="/app"><ClientDashboardPage navigate={navigate} /></AppShell>;
     }
 
@@ -138,32 +139,49 @@ export function App() {
       return <AppShell navigate={navigate} currentRoute={p}><AcademyQuizPage navigate={navigate} courseId={cId} /></AppShell>;
     }
     if (p.startsWith('/app/academy/')) return <AppShell navigate={navigate} currentRoute={p}><AcademyPage navigate={navigate} courseId={p.replace('/app/academy/', '')} /></AppShell>;
-    if (p === '/app/academy' || p === '/app/certificates') return <AppShell navigate={navigate} currentRoute={p}><AcademyPage navigate={navigate} /></AppShell>;
+    if (p === '/app/academy') return <AppShell navigate={navigate} currentRoute={p}><AcademyPage navigate={navigate} /></AppShell>;
+    if (p === '/app/certificates') return <AppShell navigate={navigate} currentRoute={p}><MyCertificatesPage navigate={navigate} /></AppShell>;
 
-    // BUSINESS MODULE
-    if (p === '/app/business/compliance') return <AppShell navigate={navigate} currentRoute={p}><ComplianceChecklistPage navigate={navigate} /></AppShell>;
-    if (p.startsWith('/app/business/compliance/')) return <AppShell navigate={navigate} currentRoute={p}><ComplianceChecklistPage navigate={navigate} itemId={p.replace('/app/business/compliance/', '')} /></AppShell>;
-    if (p === '/app/business/documents') return <AppShell navigate={navigate} currentRoute={p}><BusinessDocumentVaultPage navigate={navigate} /></AppShell>;
-    if (p === '/app/business/contracts') return <AppShell navigate={navigate} currentRoute={p}><ContractRegisterPage navigate={navigate} /></AppShell>;
-    if (p === '/app/business/profile') return <AppShell navigate={navigate} currentRoute={p}><BusinessProfilePage navigate={navigate} /></AppShell>;
-    if (p === '/app/business') return <AppShell navigate={navigate} currentRoute={p}><BusinessDashboardPage navigate={navigate} /></AppShell>;
+    // BUSINESS MODULE (Restricted to Business & Admin)
+    if (p.startsWith('/app/business')) {
+      if (currentUser && activeRole !== 'business' && activeRole !== 'admin') {
+        store.addToast('Access Restricted: Business module is only for enterprise accounts.', 'warning');
+        return <AppShell navigate={navigate} currentRoute="/app"><StudentDashboardPage navigate={navigate} /></AppShell>;
+      }
+      if (p === '/app/business/compliance') return <AppShell navigate={navigate} currentRoute={p}><ComplianceChecklistPage navigate={navigate} /></AppShell>;
+      if (p.startsWith('/app/business/compliance/')) return <AppShell navigate={navigate} currentRoute={p}><ComplianceChecklistPage navigate={navigate} itemId={p.replace('/app/business/compliance/', '')} /></AppShell>;
+      if (p === '/app/business/documents') return <AppShell navigate={navigate} currentRoute={p}><BusinessDocumentVaultPage navigate={navigate} /></AppShell>;
+      if (p === '/app/business/contracts') return <AppShell navigate={navigate} currentRoute={p}><ContractRegisterPage navigate={navigate} /></AppShell>;
+      if (p === '/app/business/profile') return <AppShell navigate={navigate} currentRoute={p}><BusinessProfilePage navigate={navigate} /></AppShell>;
+      return <AppShell navigate={navigate} currentRoute="/app/business"><BusinessDashboardPage navigate={navigate} /></AppShell>;
+    }
 
-    // LAWYER MODULE
-    if (p === '/app/lawyer/requests') return <AppShell navigate={navigate} currentRoute={p}><LawyerRequestsInboxPage navigate={navigate} /></AppShell>;
-    if (p.startsWith('/app/lawyer/requests/')) return <AppShell navigate={navigate} currentRoute={p}><LawyerRequestsInboxPage navigate={navigate} requestId={p.replace('/app/lawyer/requests/', '')} /></AppShell>;
-    if (p === '/app/lawyer/services') return <AppShell navigate={navigate} currentRoute={p}><LawyerServicesCataloguePage navigate={navigate} /></AppShell>;
-    if (p === '/app/lawyer/profile') return <AppShell navigate={navigate} currentRoute={p}><LawyerProfilePage navigate={navigate} /></AppShell>;
-    if (p === '/app/lawyer') return <AppShell navigate={navigate} currentRoute={p}><LawyerDashboardPage navigate={navigate} /></AppShell>;
+    // LAWYER MODULE (Restricted to Lawyer & Admin)
+    if (p.startsWith('/app/lawyer')) {
+      if (currentUser && activeRole !== 'lawyer' && activeRole !== 'admin') {
+        store.addToast('Access Restricted: Lawyer module is only for verified advocates.', 'warning');
+        return <AppShell navigate={navigate} currentRoute="/app"><StudentDashboardPage navigate={navigate} /></AppShell>;
+      }
+      if (p === '/app/lawyer/requests') return <AppShell navigate={navigate} currentRoute={p}><LawyerRequestsInboxPage navigate={navigate} /></AppShell>;
+      if (p.startsWith('/app/lawyer/requests/')) return <AppShell navigate={navigate} currentRoute={p}><LawyerRequestsInboxPage navigate={navigate} requestId={p.replace('/app/lawyer/requests/', '')} /></AppShell>;
+      if (p === '/app/lawyer/services') return <AppShell navigate={navigate} currentRoute={p}><LawyerServicesCataloguePage navigate={navigate} /></AppShell>;
+      if (p === '/app/lawyer/profile') return <AppShell navigate={navigate} currentRoute={p}><LawyerProfilePage navigate={navigate} /></AppShell>;
+      return <AppShell navigate={navigate} currentRoute="/app/lawyer"><LawyerDashboardPage navigate={navigate} /></AppShell>;
+    }
 
     // USER ACCOUNT ROUTES (EXACT & PREFIX MATCHING)
     if (p === '/app/profile' || p.startsWith('/app/profile')) return <AppShell navigate={navigate} currentRoute={p}><ProfilePage navigate={navigate} /></AppShell>;
     if (p === '/app/settings' || p.startsWith('/app/settings')) return <AppShell navigate={navigate} currentRoute={p}><SettingsPage navigate={navigate} /></AppShell>;
     if (p === '/app/notifications' || p.startsWith('/app/notifications')) return <AppShell navigate={navigate} currentRoute={p}><NotificationsPage navigate={navigate} /></AppShell>;
 
-    // ADMIN ROUTES (/admin/*)
+    // ADMIN ROUTES (/admin/*) (Restricted to Admin)
     if (p.startsWith('/admin')) {
+      if (currentUser && activeRole !== 'admin') {
+        store.addToast('Access Restricted: Administrator privileges required.', 'warning');
+        return <AppShell navigate={navigate} currentRoute="/app"><StudentDashboardPage navigate={navigate} /></AppShell>;
+      }
       const tab = p.replace('/admin/', '').replace('/admin', '') || 'overview';
-      return <AdminOpsDashboardPage navigate={navigate} activeTab={tab} />;
+      return <AppShell navigate={navigate} currentRoute={p}><AdminOpsDashboardPage navigate={navigate} activeTab={tab} /></AppShell>;
     }
 
     // DEFAULT FALLBACK

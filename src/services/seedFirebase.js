@@ -59,59 +59,6 @@ export async function seedInitialDataToFirestore() {
       await setDoc(doc(db, 'requests', req.id), req);
     }
 
-    // 10. Seed Users (Initial Demo Accounts for all 5 roles)
-    const seedUsers = [
-      {
-        id: INITIAL_DATA.currentUser.id,
-        name: INITIAL_DATA.currentUser.name,
-        email: INITIAL_DATA.currentUser.email,
-        role: 'client',
-        city: 'Mumbai',
-        state: 'Maharashtra',
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: 'user-002',
-        name: 'Adv. Priya Malhotra',
-        email: 'priya.malhotra@lawable.in',
-        role: 'lawyer',
-        city: 'Mumbai',
-        state: 'Maharashtra',
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: 'user-003',
-        name: 'Rohan Mehta',
-        email: 'rohan.student@example.com',
-        role: 'student',
-        city: 'Ahmedabad',
-        state: 'Gujarat',
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: 'user-004',
-        name: 'NexWave Admin',
-        email: 'admin@nexwave.in',
-        role: 'business',
-        city: 'Mumbai',
-        state: 'Maharashtra',
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: 'user-admin-001',
-        name: 'Lawable Admin Superuser',
-        email: 'admin@lawable.in',
-        role: 'admin',
-        city: 'New Delhi',
-        state: 'Delhi',
-        createdAt: new Date().toISOString()
-      }
-    ];
-
-    for (const userObj of seedUsers) {
-      await setDoc(doc(db, 'users', userObj.id), userObj);
-    }
-
     console.log('✅ Firestore seeding completed successfully!');
     return { success: true, seeded: true };
   } catch (error) {

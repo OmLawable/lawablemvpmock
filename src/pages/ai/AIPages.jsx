@@ -248,7 +248,7 @@ export const AIChatPage = ({ navigate, conversationId }) => {
 export const AIDraftPage = ({ navigate }) => {
   const templates = store.getState().draftTemplates;
   const [selectedTmpl, setSelectedTmpl] = useState(templates[0]);
-  const [parties, setParties] = useState('NexWave Solutions Pvt Ltd & Acme Corp');
+  const [parties, setParties] = useState('');
   const [governingLaw, setGoverningLaw] = useState('Mumbai, Maharashtra (India)');
   const [consideration, setConsideration] = useState('₹ 5,00,000');
 

@@ -198,11 +198,11 @@ export const ContactPage = ({ navigate }) => {
           <form onSubmit={(e) => { e.preventDefault(); setSubmitted(true); }}>
             <div className="form-group">
               <label className="form-label">Your Name</label>
-              <input type="text" className="form-input" required placeholder="Aarav Sharma" />
+              <input type="text" className="form-input" required placeholder="e.g. Rahul Verma" />
             </div>
             <div className="form-group">
               <label className="form-label">Email Address</label>
-              <input type="email" className="form-input" required placeholder="aarav@example.com" />
+              <input type="email" className="form-input" required placeholder="you@example.com" />
             </div>
             <div className="form-group">
               <label className="form-label">Category</label>
@@ -490,9 +490,9 @@ export const PublicMarketplacePage = ({ navigate, lawyerId, serviceId }) => {
               </div>
               <p className="text-caption text-secondary mb-3" style={{ fontSize: 13 }}>{lawyer.firm} • <MapPin size={13} style={{ display: 'inline', margin: '0 2px' }} /> {lawyer.city}</p>
               
-              <div className="flex flex-wrap gap-2 mb-6">
+              <div className="flex flex-wrap gap-2 mb-6" style={{ display: 'flex', flexWrap: 'wrap', width: '100%' }}>
                 {lawyer.practiceAreas.slice(0, 3).map((area, idx) => (
-                  <Badge key={idx} variant="neutral" size="sm" style={{ padding: '4px 10px', fontSize: 11 }}>{area}</Badge>
+                  <Badge key={idx} variant="neutral" size="sm" style={{ padding: '4px 10px', fontSize: 11, whiteSpace: 'nowrap' }}>{area}</Badge>
                 ))}
               </div>
             </div>

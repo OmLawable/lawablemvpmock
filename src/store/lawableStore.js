@@ -1,7 +1,7 @@
 import { INITIAL_DATA } from './initialData';
 import { auth } from '../config/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { getUserProfile } from '../services/firebaseService';
+import { getUserProfile, logoutUserWithFirebase } from '../services/firebaseService';
 import { seedInitialDataToFirestore } from '../services/seedFirebase';
 
 class LawableStore {
@@ -21,38 +21,59 @@ class LawableStore {
       if (firebaseUser) {
         let profile = await getUserProfile(firebaseUser.uid);
         this.state.currentUser = {
-          ...this.state.currentUser,
           id: firebaseUser.uid,
           uid: firebaseUser.uid,
           email: firebaseUser.email,
           name: firebaseUser.displayName || (profile && profile.name) || firebaseUser.email.split('@')[0],
-          role: (profile && profile.role) || this.state.currentUser.role || 'client',
+          role: (profile && profile.role) || (this.state.currentUser && this.state.currentUser.role) || 'client',
           emailVerified: firebaseUser.emailVerified
         };
         this.notify();
+      } else {
+        // Clear any old mock session if Firebase has no logged-in user
+        if (this.state.currentUser && this.state.currentUser.id === 'user-001') {
+          this.state.currentUser = null;
+          this.notify();
+        }
       }
     });
   }
 
   loadState() {
     try {
-      const saved = localStorage.getItem('lawable_state_v3');
+      // Clear all legacy storage versions with old mock data
+      ['lawable_state_v1', 'lawable_state_v2', 'lawable_state_v3'].forEach((k) => localStorage.removeItem(k));
+
+      const saved = localStorage.getItem('lawable_state_v4');
       if (saved) {
         const parsed = JSON.parse(saved);
+        let loadedUser = parsed.currentUser || null;
+        if (loadedUser && (loadedUser.id === 'user-001' || loadedUser.email === 'aarav.sharma@example.com' || loadedUser.name === 'NexWave Solutions')) {
+          loadedUser = null;
+        }
+
+        let loadedBiz = parsed.businessProfile || null;
+        if (loadedBiz && loadedBiz.companyName === 'NexWave Solutions Pvt Ltd') {
+          loadedBiz = null;
+        }
+
         this.state = {
           ...INITIAL_DATA,
           ...parsed,
-          currentUser: { ...INITIAL_DATA.currentUser, ...(parsed.currentUser || {}) },
+          currentUser: loadedUser,
+          businessProfile: loadedBiz,
           roles: INITIAL_DATA.roles,
           lawyers: (parsed.lawyers && parsed.lawyers.length >= 10) ? parsed.lawyers : INITIAL_DATA.lawyers,
           categories: INITIAL_DATA.categories,
           services: (parsed.services && parsed.services.length >= 6) ? parsed.services : INITIAL_DATA.services,
-          aiConversations: parsed.aiConversations && parsed.aiConversations.length ? parsed.aiConversations : INITIAL_DATA.aiConversations,
-          documents: parsed.documents && parsed.documents.length ? parsed.documents : INITIAL_DATA.documents,
-          requests: parsed.requests && parsed.requests.length ? parsed.requests : INITIAL_DATA.requests,
+          aiConversations: (parsed.aiConversations || []).filter(c => c.id !== 'conv-301'),
+          documents: (parsed.documents || []).filter(d => d.id !== 'doc-001' && d.id !== 'doc-002' && d.id !== 'doc-003'),
+          requests: (parsed.requests || []).filter(r => r.id !== 'req-9001' && r.id !== 'req-9002'),
+          contracts: (parsed.contracts || []).filter(c => c.id !== 'cnt-1' && c.id !== 'cnt-2'),
+          complianceChecklist: parsed.complianceChecklist || [],
           courses: INITIAL_DATA.courses,
-          certificates: parsed.certificates || INITIAL_DATA.certificates,
-          notifications: parsed.notifications || INITIAL_DATA.notifications,
+          certificates: (parsed.certificates || []).filter(c => c.id !== 'cert-1'),
+          notifications: parsed.notifications || [],
           blogs: INITIAL_DATA.blogs
         };
       } else {
@@ -75,7 +96,7 @@ class LawableStore {
 
   notify() {
     try {
-      localStorage.setItem('lawable_state_v3', JSON.stringify(this.state));
+      localStorage.setItem('lawable_state_v4', JSON.stringify(this.state));
     } catch (e) {
       console.error('Failed to save state to local storage', e);
     }
@@ -99,19 +120,33 @@ class LawableStore {
 
   // --- Auth & User State (PRD §6.1) ---
   setRole(roleId) {
-    this.state.currentUser.role = roleId;
+    if (this.state.currentUser) {
+      this.state.currentUser.role = roleId;
+    }
     this.addToast(`Switched active workspace role to ${roleId.toUpperCase()}`, 'info');
     this.notify();
   }
 
   updateProfile(profileData) {
-    this.state.currentUser = { ...this.state.currentUser, ...profileData };
+    this.state.currentUser = { ...(this.state.currentUser || {}), ...profileData };
     this.addToast('Profile details updated successfully', 'success');
     this.notify();
   }
 
   setCurrentUser(userData) {
-    this.state.currentUser = { ...this.state.currentUser, ...userData };
+    this.state.currentUser = userData ? { ...(this.state.currentUser || {}), ...userData } : null;
+    this.notify();
+  }
+
+  async logout() {
+    try {
+      await logoutUserWithFirebase();
+    } catch (e) {
+      console.warn('Firebase logout notice:', e);
+    }
+    this.state.currentUser = null;
+    ['lawable_state_v1', 'lawable_state_v2', 'lawable_state_v3', 'lawable_state_v4'].forEach(k => localStorage.removeItem(k));
+    this.addToast('Logged out successfully', 'info');
     this.notify();
   }
 
@@ -236,13 +271,104 @@ class LawableStore {
     }
   }
 
+  // --- Academy Quizzes & Examinations ---
+  getQuizForLearner(courseId) {
+    const course = (this.state.courses || []).find((c) => c.id === courseId) || (this.state.courses && this.state.courses[0]);
+    if (!course) return null;
+
+    const sampleQuestions = [
+      {
+        id: 'q1',
+        question: `Under Indian contract jurisprudence, what is essential for contract validity under Section 10 of the Indian Contract Act 1872?`,
+        options: [
+          'Free consent of parties competent to contract for a lawful consideration',
+          'Oral agreement without lawful consideration',
+          'Execution exclusively in High Court presence',
+          'Unilateral execution without acceptance notice'
+        ],
+        correctIndex: 0
+      },
+      {
+        id: 'q2',
+        question: 'Under Section 73 of the Indian Contract Act 1872, what damages are recoverable upon contract breach?',
+        options: [
+          'Indirect and remote losses regardless of foreseeability',
+          'Direct losses that naturally arose in the usual course of things',
+          'Punitive damages without actual loss proof',
+          'Speculative prospective profits'
+        ],
+        correctIndex: 1
+      },
+      {
+        id: 'q3',
+        question: 'Why are uncapped indemnity clauses flagged as high-risk in commercial contracts?',
+        options: [
+          'They waive arbitration rights',
+          'They override statutory Section 73 restrictions and expose parties to unlimited liability',
+          'They are automatically void under Bar Council rules',
+          'They require mandatory stamp duty payment in all states'
+        ],
+        correctIndex: 1
+      }
+    ];
+
+    return {
+      courseId: course.id,
+      title: `${course.title} — Final Examination`,
+      passMark: 65,
+      questions: sampleQuestions
+    };
+  }
+
+  submitQuizAnswers(courseId, answers) {
+    const quiz = this.getQuizForLearner(courseId);
+    if (!quiz) return { passed: false, score: 0 };
+
+    let correctCount = 0;
+    quiz.questions.forEach((q, idx) => {
+      if (answers[idx] === q.correctIndex) {
+        correctCount++;
+      }
+    });
+
+    const score = Math.round((correctCount / quiz.questions.length) * 100);
+    const passed = score >= quiz.passMark;
+
+    let cert = null;
+    if (passed) {
+      const course = (this.state.courses || []).find((c) => c.id === courseId) || {};
+      const user = this.state.currentUser || {};
+      const randCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      cert = {
+        id: `cert-${Date.now()}`,
+        userId: user.id || user.uid || 'user-001',
+        learnerName: user.name || 'Learner',
+        learnerEmail: user.email || '',
+        courseId: course.id || courseId,
+        courseTitle: course.title || 'Practical Contract Drafting under Indian Jurisprudence',
+        certificateNumber: `LWB-2026-${randCode}`,
+        score,
+        issueDate: new Date().toISOString().split('T')[0],
+        verified: true
+      };
+
+      if (!this.state.certificates) this.state.certificates = [];
+      this.state.certificates.unshift(cert);
+      this.addToast(`Congratulations! You passed with ${score}% and earned Certificate #${cert.certificateNumber}`, 'success');
+      this.notify();
+    } else {
+      this.addToast(`Exam score: ${score}%. Minimum passing grade is ${quiz.passMark}%.`, 'warning');
+    }
+
+    return { passed, score, certificate: cert };
+  }
+
   // --- Reset Local Demo State ---
   resetDemoData() {
     this.state = JSON.parse(JSON.stringify(INITIAL_DATA));
-    localStorage.removeItem('lawable_state_v1');
-    localStorage.removeItem('lawable_state_v2');
-    localStorage.setItem('lawable_state_v3', JSON.stringify(INITIAL_DATA));
-    this.addToast('Demo workspace reset to initial PRD seed state', 'success');
+    ['lawable_state_v1', 'lawable_state_v2', 'lawable_state_v3', 'lawable_state_v4'].forEach(k => localStorage.removeItem(k));
+    localStorage.setItem('lawable_state_v4', JSON.stringify(INITIAL_DATA));
+    this.addToast('Demo workspace reset to initial state', 'success');
     this.notify();
   }
 }
