@@ -206,3 +206,69 @@ export const AcademyQuizPage = ({ navigate, courseId }) => {
     </div>
   );
 };
+
+// MY CERTIFICATES PAGE (Learner's earned credentials)
+export const MyCertificatesPage = ({ navigate }) => {
+  const [state, setState] = useState(store.getState() || {});
+
+  useEffect(() => {
+    return store.subscribe((newState) => setState(newState));
+  }, []);
+
+  const user = state.currentUser || { name: 'Student' };
+  const userCertificates = (state.certificates || []).filter(
+    (c) => (c.userId && (c.userId === user.id || c.userId === user.uid)) ||
+           (c.learnerEmail && user.email && c.learnerEmail.toLowerCase() === user.email.toLowerCase()) ||
+           (c.learnerName && user.name && c.learnerName.toLowerCase() === user.name.toLowerCase() && user.name !== 'Student')
+  );
+
+  return (
+    <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <Badge variant="primary" className="mb-2">Accredited Credentials</Badge>
+          <h1 className="h2" style={{ margin: 0 }}>My Earned Certificates</h1>
+        </div>
+        <Button variant="secondary" onClick={() => navigate('/app/academy')}>
+          <BookOpen size={16} /> Explore Courses
+        </Button>
+      </div>
+
+      {userCertificates.length === 0 ? (
+        <Card className="text-center py-12 px-6" padding="48px" style={{ backgroundColor: '#FFF' }}>
+          <div className="icon-box mb-4" style={{ width: 64, height: 64, borderRadius: '50%', margin: '0 auto' }}>
+            <Award size={32} />
+          </div>
+          <h3 className="h3 mb-2">No Certificates Earned Yet</h3>
+          <p className="text-secondary mb-6" style={{ maxWidth: 520, margin: '0 auto 24px', lineHeight: 1.6 }}>
+            You haven't completed any course examinations yet. Enroll in Lawable Academy courses, finish all syllabus modules, and pass the final exam to earn Bar Council-aligned verified credentials.
+          </p>
+          <Button size="lg" onClick={() => navigate('/app/academy')}>
+            Start an Academy Course →
+          </Button>
+        </Card>
+      ) : (
+        <div className="grid grid-2 gap-6">
+          {userCertificates.map((cert) => (
+            <Card key={cert.id} padding="32px" style={{ backgroundColor: '#FFF' }}>
+              <div className="flex items-center justify-between mb-4">
+                <Badge variant="success">Official Verified</Badge>
+                <span className="text-caption text-secondary">#{cert.certificateNumber}</span>
+              </div>
+              <h3 className="h3 mb-2">{cert.courseTitle}</h3>
+              <p className="text-caption text-secondary mb-6">
+                Learner: <strong>{cert.learnerName}</strong> • Score: <strong>{cert.score}%</strong> • Issued: {cert.issueDate}
+              </p>
+              <div className="flex items-center justify-between pt-4 border-t" style={{ borderColor: 'var(--color-border)' }}>
+                <span className="text-caption text-muted">Cryptographically Recorded</span>
+                <Button size="sm" onClick={() => navigate(`/verify/${cert.certificateNumber}`)}>
+                  View Official Certificate →
+                </Button>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};

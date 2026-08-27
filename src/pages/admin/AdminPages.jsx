@@ -66,7 +66,7 @@ export const AdminOpsDashboardPage = ({ navigate, activeTab = 'overview' }) => {
           <div className="grid grid-4 gap-6 mb-12">
             <Card padding="28px" style={{ backgroundColor: '#FFF' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Registered Users</div>
-              <div style={{ fontSize: 32, fontWeight: 800, color: 'var(--color-primary)', marginTop: 6 }}>{state.adminUsers.length}</div>
+              <div style={{ fontSize: 32, fontWeight: 800, color: 'var(--color-primary)', marginTop: 6 }}>{(state.adminUsers || []).length}</div>
             </Card>
 
             <Card padding="28px" style={{ backgroundColor: '#FFF' }}>
@@ -148,19 +148,27 @@ export const AdminOpsDashboardPage = ({ navigate, activeTab = 'overview' }) => {
                 </tr>
               </thead>
               <tbody>
-                {state.adminUsers.map((u) => (
-                  <tr key={u.id}>
-                    <td style={{ fontWeight: 600 }}>{u.name}</td>
-                    <td>{u.email}</td>
-                    <td><Badge variant="primary">{u.role.toUpperCase()}</Badge></td>
-                    <td><Badge variant={u.status === 'active' ? 'success' : 'danger'}>{u.status.toUpperCase()}</Badge></td>
-                    <td>
-                      <Button size="sm" variant="secondary" onClick={() => store.addToast(`Toggled user suspension for ${u.name}`, 'warning')}>
-                        {u.status === 'active' ? 'Suspend User' : 'Reactivate'}
-                      </Button>
+                {(state.adminUsers || []).length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="text-center py-6 text-secondary">
+                      No registered users yet. Newly registered user accounts will appear here.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  (state.adminUsers || []).map((u) => (
+                    <tr key={u.id}>
+                      <td style={{ fontWeight: 600 }}>{u.name}</td>
+                      <td>{u.email}</td>
+                      <td><Badge variant="primary">{u.role.toUpperCase()}</Badge></td>
+                      <td><Badge variant={u.status === 'active' ? 'success' : 'danger'}>{u.status.toUpperCase()}</Badge></td>
+                      <td>
+                        <Button size="sm" variant="secondary" onClick={() => store.addToast(`Toggled user suspension for ${u.name}`, 'warning')}>
+                          {u.status === 'active' ? 'Suspend User' : 'Reactivate'}
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

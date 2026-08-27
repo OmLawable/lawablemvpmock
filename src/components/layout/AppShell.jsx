@@ -18,7 +18,8 @@ export const AppShell = ({ children, currentRoute, navigate }) => {
   }, []);
 
   const currentState = state || store.getState() || {};
-  const currentUser = currentState.currentUser || { name: 'User', email: 'user@example.com', role: 'client', avatar: '' };
+  const currentUser = currentState.currentUser || { name: 'My Account', email: '', role: 'client', avatar: '' };
+  const userInitial = (currentUser.name ? currentUser.name[0] : (currentUser.email ? currentUser.email[0] : 'U')).toUpperCase();
   const roles = currentState.roles || [];
   const notifications = currentState.notifications || [];
   const unreadNotifs = notifications.filter((n) => !n.read).length;
@@ -138,36 +139,13 @@ export const AppShell = ({ children, currentRoute, navigate }) => {
               </div>
             </div>
           </div>
-
-          {/* Role Switcher Toolbar Banner */}
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg-surface-muted)' }}>
-            <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', marginBottom: 8, textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em' }}>Active Role View</div>
-            <div style={{ position: 'relative' }}>
-              <button
-                className="btn btn-secondary btn-sm flex items-center justify-between w-full"
-                onClick={() => setRoleMenuOpen(!roleMenuOpen)}
-                style={{ width: '100%', fontSize: 13, backgroundColor: '#FFFFFF', padding: '10px 14px' }}
-              >
-                <span style={{ fontWeight: 600, color: 'var(--color-primary)' }}>{roles.find(r => r.id === currentUser.role)?.title || 'Client / Individual'}</span>
-                <ChevronDown size={14} />
-              </button>
-              {roleMenuOpen && (
-                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: '#FFFFFF', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)', zIndex: 50, marginTop: 4, padding: 6 }}>
-                  {roles.map((r) => (
-                    <div
-                      key={r.id}
-                      style={{ padding: '10px 14px', fontSize: 13, cursor: 'pointer', borderRadius: 'var(--radius-sm)', backgroundColor: currentUser.role === r.id ? 'var(--color-primary-light)' : 'transparent', fontWeight: currentUser.role === r.id ? 600 : 400, color: currentUser.role === r.id ? 'var(--color-primary)' : 'var(--color-text-primary)' }}
-                      onClick={() => {
-                        store.setRole(r.id);
-                        setRoleMenuOpen(false);
-                        navigate('/app');
-                      }}
-                    >
-                      {r.title}
-                    </div>
-                  ))}
-                </div>
-              )}
+          {/* User Role Indicator (Locked to Authenticated Role) */}
+          <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg-surface-muted)' }}>
+            <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', marginBottom: 4, textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em' }}>Account Role</div>
+            <div className="flex items-center gap-2">
+              <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--color-primary)' }}>
+                {roles.find(r => r.id === currentUser.role)?.title || (currentUser.role ? currentUser.role.toUpperCase() : 'Student')}
+              </span>
             </div>
           </div>
 
@@ -215,17 +193,27 @@ export const AppShell = ({ children, currentRoute, navigate }) => {
             style={{ cursor: 'pointer', borderRadius: 'var(--radius-md)' }}
             onClick={() => navigate('/app/profile')}
           >
-            <img src={currentUser.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'} alt="Avatar" style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover' }} />
+            {currentUser.avatar ? (
+              <img src={currentUser.avatar} alt="Avatar" style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover' }} />
+            ) : (
+              <div style={{ width: 38, height: 38, borderRadius: '50%', backgroundColor: 'var(--color-primary)', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
+                {userInitial}
+              </div>
+            )}
             <div style={{ overflow: 'hidden' }}>
               <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--color-text-primary)', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentUser.name}</div>
               <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{currentUser.email}</div>
             </div>
           </div>
           <div className="flex items-center justify-between mt-3 pt-3 border-t" style={{ borderColor: 'var(--color-border)' }}>
-            <a href="/admin" onClick={(e) => { e.preventDefault(); navigate('/admin'); }} className="btn btn-ghost btn-sm text-caption" style={{ color: 'var(--color-text-secondary)' }}>
-              <Shield size={14} /> Admin Ops
-            </a>
-            <button className="btn btn-ghost btn-sm" onClick={() => { store.addToast('Logged out successfully', 'info'); navigate('/auth/login'); }}>
+            {currentUser.role === 'admin' ? (
+              <a href="/admin" onClick={(e) => { e.preventDefault(); navigate('/admin'); }} className="btn btn-ghost btn-sm text-caption" style={{ color: 'var(--color-text-secondary)' }}>
+                <Shield size={14} /> Admin Ops
+              </a>
+            ) : (
+              <span className="text-caption text-secondary" style={{ fontSize: 11 }}>Lawable OS</span>
+            )}
+            <button className="btn btn-ghost btn-sm" title="Log Out" onClick={async () => { await store.logout(); navigate('/auth/login'); }}>
               <LogOut size={14} />
             </button>
           </div>

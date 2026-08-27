@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Shield, CheckCircle, Clock, User, ShoppingBag, AlertTriangle, 
   FileText, Check, X, Send, Plus, Edit
@@ -6,21 +6,36 @@ import {
 import { Card, Button, Badge, StatusChip, MetricCard } from '../../components/common/UIComponents';
 import { store } from '../../store/lawableStore';
 
-// SCREEN 36 — LAWYER DASHBOARD (ADVOCATE VERIFICATION BANNER REDESIGN)
+// SCREEN 36 — LAWYER DASHBOARD
 export const LawyerDashboardPage = ({ navigate }) => {
-  const currentUser = store.getState().currentUser;
-  const lawyers = store.getState().lawyers;
-  const requests = store.getState().requests;
-  const lawyer = lawyers.find(l => l.userId === currentUser.id) || lawyers[0];
+  const [state, setState] = useState(store.getState());
+  useEffect(() => store.subscribe(setState), []);
+
+  const currentUser = state.currentUser || {};
+  const lawyers = state.lawyers || [];
+  const requests = state.requests || [];
+  const lawyer = (state.lawyerProfile) || lawyers.find(l => l.userId === currentUser.id) || {
+    id: currentUser.id || 'lawyer-me',
+    name: currentUser.name || 'Advocate',
+    specialties: ['General Practice'],
+    verificationStatus: 'verified',
+    consultationFee: 0,
+    rating: 5.0,
+    reviewCount: 0,
+    barCouncilNo: 'Not Set',
+    bio: '',
+    city: '',
+    experienceYears: 0
+  };
 
   const pendingCount = requests.filter(r => r.status === 'submitted').length;
   const inProgressCount = requests.filter(r => r.status === 'in_progress' || r.status === 'accepted').length;
 
-  const isVerified = lawyer.verificationStatus === 'verified';
+  const isVerified = (lawyer.verificationStatus || 'verified') === 'verified';
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-      {/* Advocate Verification Status Banner Redesign */}
+      {/* Advocate Verification Status Banner */}
       <div
         className="p-6 border rounded-lg mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6"
         style={{
@@ -39,7 +54,7 @@ export const LawyerDashboardPage = ({ navigate }) => {
               backgroundColor: isVerified ? '#D1FAE5' : '#FEF3C7',
               display: 'flex',
               alignItems: 'center',
-              justify: 'center',
+              justifyContent: 'center',
               flexShrink: 0
             }}
           >
@@ -48,7 +63,7 @@ export const LawyerDashboardPage = ({ navigate }) => {
           <div>
             <div className="flex items-center gap-3 mb-1">
               <span style={{ fontWeight: 700, fontSize: 16, color: isVerified ? '#065F46' : '#92400E' }}>
-                Advocate Verification Status: {lawyer.verificationStatus.toUpperCase()}
+                Advocate Verification Status: {(lawyer.verificationStatus || 'verified').toUpperCase()}
               </span>
               <Badge variant={isVerified ? 'success' : 'warning'} style={{ padding: '4px 10px' }}>
                 {isVerified ? 'Live on Marketplace' : 'Action Required'}
@@ -56,8 +71,8 @@ export const LawyerDashboardPage = ({ navigate }) => {
             </div>
             <p style={{ fontSize: 13, color: '#334155', margin: 0, lineHeight: 1.5 }}>
               {isVerified
-                ? 'Your credentials have been verified by Lawable Platform Admin. Your profile is live on Marketplace.'
-                : 'Your Bar Council credentials are under review by Admin Ops. You can still manage services.'}
+                ? 'Your credentials have been verified by Lawable Platform Admin. Your profile is active on the Marketplace.'
+                : 'Your Bar Council credentials are under review by Admin Ops. You can still manage your services.'}
             </p>
           </div>
         </div>
@@ -75,8 +90,8 @@ export const LawyerDashboardPage = ({ navigate }) => {
       <div className="grid grid-4 gap-6 mb-8">
         <MetricCard title="Pending Inbox" value={pendingCount} subtitle="Requires Advocate Action" icon={Clock} onClick={() => navigate('/app/lawyer/requests')} />
         <MetricCard title="Active Matters" value={inProgressCount} subtitle="In Progress Review" icon={FileText} onClick={() => navigate('/app/lawyer/requests')} />
-        <MetricCard title="Consultation Fee" value={`₹ ${lawyer.consultationFee}`} subtitle="Standard 45 Min Rate" icon={ShoppingBag} onClick={() => navigate('/app/lawyer/profile')} />
-        <MetricCard title="Public Rating" value={`★ ${lawyer.rating}`} subtitle={`${lawyer.reviewCount} Verified Reviews`} icon={CheckCircle} />
+        <MetricCard title="Consultation Fee" value={`₹ ${lawyer.consultationFee || 2500}`} subtitle="Standard 45 Min Rate" icon={ShoppingBag} onClick={() => navigate('/app/lawyer/profile')} />
+        <MetricCard title="Public Rating" value={`★ ${lawyer.rating || 5.0}`} subtitle={`${lawyer.reviewCount || 0} Verified Reviews`} icon={CheckCircle} />
       </div>
 
       {/* Pending Requests Table */}
@@ -85,49 +100,82 @@ export const LawyerDashboardPage = ({ navigate }) => {
         <Button size="sm" variant="ghost" onClick={() => navigate('/app/lawyer/requests')}>View All Inbox →</Button>
       </div>
 
-      <div className="table-container">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Request ID</th>
-              <th>Client</th>
-              <th>Service Title</th>
-              <th>Source</th>
-              <th>Fee</th>
-              <th>Status</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {requests.map((r) => (
-              <tr key={r.id}>
-                <td style={{ fontWeight: 600 }}>#{r.id}</td>
-                <td>{r.clientName}</td>
-                <td>{r.serviceTitle}</td>
-                <td><Badge variant="neutral">{r.source}</Badge></td>
-                <td style={{ fontWeight: 700, color: 'var(--color-primary)' }}>₹ {r.fee}</td>
-                <td><StatusChip status={r.status} /></td>
-                <td>
-                  <Button size="sm" onClick={() => navigate(`/app/lawyer/requests/${r.id}`)}>Open Detail</Button>
-                </td>
+      {requests.length === 0 ? (
+        <Card padding="36px" className="text-center" style={{ backgroundColor: '#FFF' }}>
+          <h3 className="h3 mb-2">No Active Client Requests</h3>
+          <p className="text-secondary mb-4">When clients book consultations or escalate contract reviews from the AI assistant, they will appear here in your advocate inbox.</p>
+          <Button variant="secondary" onClick={() => navigate('/app/lawyer/services')}>Manage Services Catalogue</Button>
+        </Card>
+      ) : (
+        <div className="table-container">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Request ID</th>
+                <th>Client</th>
+                <th>Service Title</th>
+                <th>Source</th>
+                <th>Fee</th>
+                <th>Status</th>
+                <th>Action</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {requests.map((r) => (
+                <tr key={r.id}>
+                  <td style={{ fontWeight: 600 }}>#{r.id}</td>
+                  <td>{r.clientName}</td>
+                  <td>{r.serviceTitle}</td>
+                  <td><Badge variant="neutral">{r.source}</Badge></td>
+                  <td style={{ fontWeight: 700, color: 'var(--color-primary)' }}>₹ {r.fee}</td>
+                  <td><StatusChip status={r.status} /></td>
+                  <td>
+                    <Button size="sm" onClick={() => navigate(`/app/lawyer/requests/${r.id}`)}>Open Detail</Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 };
 
 // SCREEN 37 & 38 — LAWYER REQUEST INBOX & ACTION DETAIL
 export const LawyerRequestsInboxPage = ({ navigate, requestId }) => {
-  const requests = store.getState().requests;
+  const [state, setState] = useState(store.getState());
+  useEffect(() => store.subscribe(setState), []);
+
+  const requests = state.requests || [];
   const [selectedId, setSelectedId] = useState(requestId || requests[0]?.id);
   const req = requests.find((r) => r.id === selectedId) || requests[0];
 
   const handleAction = (status, note) => {
-    store.updateRequestStatus(req.id, status, note);
+    if (req) {
+      store.updateRequestStatus(req.id, status, note);
+    }
   };
+
+  if (requests.length === 0) {
+    return (
+      <div style={{ maxWidth: 900, margin: '0 auto' }}>
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <Badge variant="primary" className="mb-2">Advocate Inbox</Badge>
+            <h1 className="h2" style={{ margin: 0 }}>Client Legal Matters</h1>
+          </div>
+          <Button variant="secondary" onClick={() => navigate('/app/lawyer')}>← Back to Dashboard</Button>
+        </div>
+        <Card padding="48px" className="text-center" style={{ backgroundColor: '#FFF' }}>
+          <Clock size={40} style={{ color: 'var(--color-text-secondary)', margin: '0 auto 16px' }} />
+          <h3 className="h3 mb-2">Your Inbox is Clean</h3>
+          <p className="text-secondary mb-4">No active client service requests at the moment. As clients book consultations or escalate documents, requests will show up here.</p>
+          <Button onClick={() => navigate('/app/lawyer')}>Return to Dashboard</Button>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', display: 'grid', gridTemplateColumns: '320px 1fr', gap: 32 }}>
@@ -165,7 +213,7 @@ export const LawyerRequestsInboxPage = ({ navigate, requestId }) => {
                 <h1 className="h2" style={{ margin: 0 }}>Request #{req.id}</h1>
                 <StatusChip status={req.status} />
               </div>
-              <p className="text-caption text-secondary mt-1">Client: {req.clientName} • Source: {req.source.toUpperCase()}</p>
+              <p className="text-caption text-secondary mt-1">Client: {req.clientName} • Source: {(req.source || 'DIRECT').toUpperCase()}</p>
             </div>
             <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--color-primary)' }}>₹ {req.fee}</div>
           </div>
@@ -216,7 +264,7 @@ export const LawyerRequestsInboxPage = ({ navigate, requestId }) => {
           {/* Audit Timeline */}
           <h3 className="h4 mb-4">Audit Timeline</h3>
           <div className="flex flex-col gap-4 pl-4 border-l-2" style={{ borderColor: 'var(--color-primary-border)' }}>
-            {req.timeline.map((ev, idx) => (
+            {(req.timeline || []).map((ev, idx) => (
               <div key={idx} className="text-caption">
                 <div style={{ fontWeight: 600, fontSize: 13 }}>{ev.actor} — <span style={{ color: 'var(--color-primary)' }}>{ev.action}</span></div>
                 <div className="text-secondary mt-0.5">{ev.note}</div>
@@ -232,30 +280,55 @@ export const LawyerRequestsInboxPage = ({ navigate, requestId }) => {
 
 // SCREEN 39 — LAWYER PROFILE
 export const LawyerProfilePage = ({ navigate }) => {
-  const currentUser = store.getState().currentUser;
-  const lawyers = store.getState().lawyers;
-  const lawyer = lawyers.find(l => l.userId === currentUser.id) || lawyers[0];
+  const [state, setState] = useState(store.getState());
+  useEffect(() => store.subscribe(setState), []);
 
-  const [fee, setFee] = useState(lawyer.consultationFee);
-  const [bio, setBio] = useState(lawyer.bio);
+  const currentUser = state.currentUser || {};
+  const lawyers = state.lawyers || [];
+  const lawyer = (state.lawyerProfile) || lawyers.find(l => l.userId === currentUser.id) || {
+    id: currentUser.id || 'lawyer-me',
+    name: currentUser.name || 'Advocate',
+    barCouncilNo: '',
+    consultationFee: '',
+    bio: ''
+  };
+
+  const [fee, setFee] = useState(lawyer.consultationFee !== undefined && lawyer.consultationFee !== null ? lawyer.consultationFee : '');
+  const [bio, setBio] = useState(lawyer.bio || '');
+  const [barCouncilNo, setBarCouncilNo] = useState(lawyer.barCouncilNo || '');
+
+  const handleSave = (e) => {
+    e.preventDefault();
+    store.state.lawyerProfile = {
+      ...lawyer,
+      barCouncilNo: barCouncilNo,
+      consultationFee: fee !== '' ? Number(fee) : 0,
+      bio: bio
+    };
+    store.notify();
+    store.addToast('Advocate profile updated successfully', 'success');
+    navigate('/app/lawyer');
+  };
 
   return (
     <div style={{ maxWidth: 760, margin: '0 auto' }}>
       <Card padding="32px" style={{ backgroundColor: '#FFF' }}>
         <h1 className="h2 mb-4">Marketplace Advocate Profile</h1>
-        <div className="form-group">
-          <label className="form-label">Bar Council Enrolment Number (Verification Controlled)</label>
-          <input type="text" className="form-input" disabled value={lawyer.barCouncilNo} />
-        </div>
-        <div className="form-group">
-          <label className="form-label">Consultation Fee (INR)</label>
-          <input type="number" className="form-input" value={fee} onChange={(e) => setFee(e.target.value)} />
-        </div>
-        <div className="form-group mb-6">
-          <label className="form-label">Professional Bio</label>
-          <textarea className="form-textarea" value={bio} onChange={(e) => setBio(e.target.value)} />
-        </div>
-        <Button onClick={() => store.addToast('Profile updated!', 'success')}>Save Profile Updates</Button>
+        <form onSubmit={handleSave}>
+          <div className="form-group">
+            <label className="form-label">Bar Council Enrolment Number</label>
+            <input type="text" className="form-input" value={barCouncilNo} onChange={(e) => setBarCouncilNo(e.target.value)} placeholder="e.g. MAH/2024/9182" />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Consultation Fee (INR)</label>
+            <input type="number" className="form-input" value={fee} onChange={(e) => setFee(e.target.value)} placeholder="e.g. 2000" />
+          </div>
+          <div className="form-group mb-6">
+            <label className="form-label">Professional Bio</label>
+            <textarea className="form-textarea" rows={4} value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Describe your legal practice, court admissions, and advisory areas..." />
+          </div>
+          <Button type="submit">Save Profile Updates</Button>
+        </form>
       </Card>
     </div>
   );
@@ -263,7 +336,11 @@ export const LawyerProfilePage = ({ navigate }) => {
 
 // SCREEN 40 — LAWYER SERVICES CATALOGUE MANAGEMENT
 export const LawyerServicesCataloguePage = ({ navigate }) => {
-  const services = store.getState().services;
+  const [state, setState] = useState(store.getState());
+  useEffect(() => store.subscribe(setState), []);
+
+  const services = state.services || [];
+
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto' }}>
       <div className="flex items-center justify-between mb-8">
@@ -278,11 +355,11 @@ export const LawyerServicesCataloguePage = ({ navigate }) => {
       <div className="grid grid-2 gap-6">
         {services.map((s) => (
           <Card key={s.id} padding="28px" style={{ backgroundColor: '#FFF' }}>
-            <Badge variant="primary" className="mb-2">{s.serviceType.replace('_', ' ').toUpperCase()}</Badge>
+            <Badge variant="primary" className="mb-2">{(s.serviceType || 'LEGAL_SERVICE').replace('_', ' ').toUpperCase()}</Badge>
             <h3 className="h3 mb-2">{s.title}</h3>
             <p className="text-caption text-secondary mb-4" style={{ lineHeight: 1.5 }}>{s.description}</p>
             <div className="flex items-center justify-between pt-3 border-t text-caption" style={{ borderColor: 'var(--color-border)' }}>
-              <span>Timeline: {s.timelineDays} Days</span>
+              <span>Timeline: {s.timelineDays || 3} Days</span>
               <span style={{ fontWeight: 700, color: 'var(--color-primary)', fontSize: 16 }}>₹ {s.price}</span>
             </div>
           </Card>

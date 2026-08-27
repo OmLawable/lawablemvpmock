@@ -532,6 +532,8 @@ a:hover {
 
 /* Utility Flex & Grid Classes using 8px Spacing Scale */
 .flex { display: flex; }
+.flex-wrap { flex-wrap: wrap; }
+.flex-nowrap { flex-wrap: nowrap; }
 .flex-col { flex-direction: column; }
 .items-center { align-items: center; }
 .items-start { align-items: flex-start; }

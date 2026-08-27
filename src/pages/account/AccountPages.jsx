@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Settings, Bell, Shield, Download, Trash2, CheckCircle, Sparkles, BookOpen, Clock, FileText, ArrowRight, Award, Plus, ShoppingBag } from 'lucide-react';
 import { Card, Button, Badge, ConfirmationDialog, MetricCard, StatusChip } from '../../components/common/UIComponents';
 import { store } from '../../store/lawableStore';
@@ -84,10 +84,28 @@ export const ClientDashboardPage = ({ navigate }) => {
 
 // STUDENT DASHBOARD (CENTER ALIGNED HEADER & BALANCED SPACING)
 export const StudentDashboardPage = ({ navigate }) => {
-  const state = store.getState() || {};
+  const [state, setState] = useState(store.getState() || {});
+
+  useEffect(() => {
+    return store.subscribe((newState) => setState(newState));
+  }, []);
+
   const user = state.currentUser || { name: 'Student', role: 'student' };
   const courses = state.courses || [];
-  const certificates = state.certificates || [];
+
+  // Filter certificates specifically for this logged-in student
+  const userCertificates = (state.certificates || []).filter(
+    (c) => (c.userId && (c.userId === user.id || c.userId === user.uid)) ||
+           (c.learnerEmail && user.email && c.learnerEmail.toLowerCase() === user.email.toLowerCase()) ||
+           (c.learnerName && user.name && c.learnerName.toLowerCase() === user.name.toLowerCase() && user.name !== 'Student')
+  );
+
+  // Filter practice drafts specifically for this logged-in student
+  const userDrafts = (state.documents || []).filter(
+    (d) => (d.userId && (d.userId === user.id || d.userId === user.uid)) ||
+           (d.ownerEmail && user.email && d.ownerEmail.toLowerCase() === user.email.toLowerCase()) ||
+           (d.ownerName && user.name && d.ownerName.toLowerCase() === user.name.toLowerCase())
+  );
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto' }}>
@@ -113,9 +131,9 @@ export const StudentDashboardPage = ({ navigate }) => {
       {/* Metrics Row */}
       <div className="grid grid-4 gap-6 mb-12">
         <MetricCard title="Available Courses" value={courses.length} subtitle="Accredited Modules" icon={BookOpen} onClick={() => navigate('/app/academy')} />
-        <MetricCard title="Earned Certificates" value={certificates.length} subtitle="Passed Examinations" icon={Award} onClick={() => navigate('/app/certificates')} />
+        <MetricCard title="Earned Certificates" value={userCertificates.length} subtitle="Passed Examinations" icon={Award} onClick={() => navigate('/app/certificates')} />
         <MetricCard title="AI Research Limit" value="2 / 50" subtitle="Daily Messages Free" icon={Sparkles} onClick={() => navigate('/app/ai')} />
-        <MetricCard title="Practise Drafts" value="4" subtitle="Saved Exercises" icon={FileText} onClick={() => navigate('/app/documents')} />
+        <MetricCard title="Practise Drafts" value={userDrafts.length} subtitle="Saved Exercises" icon={FileText} onClick={() => navigate('/app/documents')} />
       </div>
 
       {/* Course Overview Cards */}
@@ -143,18 +161,29 @@ export const StudentDashboardPage = ({ navigate }) => {
 
 // USER PROFILE
 export const ProfilePage = ({ navigate }) => {
-  const user = store.getState().currentUser || { name: 'User', email: 'user@example.com', role: 'client', phone: '' };
-  const [name, setName] = useState(user.name);
+  const [state, setState] = useState(store.getState());
+  useEffect(() => store.subscribe(setState), []);
+
+  const user = state.currentUser || { name: '', email: '', role: 'client', phone: '' };
+  const [name, setName] = useState(user.name || '');
   const [phone, setPhone] = useState(user.phone || '');
+
+  const userInitial = (user.name ? user.name[0] : (user.email ? user.email[0] : 'U')).toUpperCase();
 
   return (
     <div style={{ maxWidth: 640, margin: '0 auto' }}>
       <Card padding="32px" style={{ backgroundColor: '#FFF' }}>
         <div className="flex items-center gap-4 mb-6 pb-4 border-b">
-          <img src={user.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'} alt={user.name} style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover' }} />
+          {user.avatar ? (
+            <img src={user.avatar} alt={user.name} style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover' }} />
+          ) : (
+            <div style={{ width: 72, height: 72, borderRadius: '50%', backgroundColor: 'var(--color-primary)', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 28, flexShrink: 0 }}>
+              {userInitial}
+            </div>
+          )}
           <div>
-            <h1 className="h2" style={{ margin: 0 }}>{user.name}</h1>
-            <p className="text-caption text-secondary mt-1">{user.email} • Active Role: {(user.role || 'CLIENT').toUpperCase()}</p>
+            <h1 className="h2" style={{ margin: 0 }}>{user.name || 'Account Profile'}</h1>
+            <p className="text-caption text-secondary mt-1">{user.email || 'No email attached'} • Active Role: {(user.role || 'CLIENT').toUpperCase()}</p>
             <Badge variant="success" className="mt-2">Email Verified</Badge>
           </div>
         </div>
@@ -166,11 +195,11 @@ export const ProfilePage = ({ navigate }) => {
         }}>
           <div className="form-group">
             <label className="form-label">Full Name</label>
-            <input type="text" className="form-input" value={name} onChange={(e) => setName(e.target.value)} />
+            <input type="text" className="form-input" required value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Sarthak Kadam" />
           </div>
           <div className="form-group">
             <label className="form-label">Phone Number</label>
-            <input type="text" className="form-input" value={phone} onChange={(e) => setPhone(e.target.value)} />
+            <input type="text" className="form-input" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 98765 43210" />
           </div>
           <Button type="submit" className="mt-4">Update Profile</Button>
         </form>
@@ -188,9 +217,10 @@ export const SettingsPage = ({ navigate }) => {
       <ConfirmationDialog
         isOpen={deleteOpen}
         onClose={() => setDeleteOpen(false)}
-        onConfirm={() => {
-          store.addToast('Account deletion request queued.', 'danger');
-          navigate('/');
+        onConfirm={async () => {
+          await store.logout();
+          setDeleteOpen(false);
+          navigate('/auth/login');
         }}
         title="Confirm Account Deletion"
         message="This action is permanent and soft-deletes your documents, AI conversations, and service requests."
