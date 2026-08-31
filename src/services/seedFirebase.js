@@ -19,10 +19,7 @@ export async function seedInitialDataToFirestore() {
       await setDoc(doc(db, 'categories', cat.id), cat);
     }
 
-    // 2. Seed Verified Lawyers
-    for (const lawyer of INITIAL_DATA.lawyers) {
-      await setDoc(doc(db, 'lawyers', lawyer.id), lawyer);
-    }
+    // (Note: Mock lawyers auto-seeding removed so only real user-created lawyer profiles are stored in Firestore)
 
     // 3. Seed Fixed-Price Services
     for (const srv of INITIAL_DATA.services) {

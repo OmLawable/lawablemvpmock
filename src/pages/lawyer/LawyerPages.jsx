@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { Card, Button, Badge, StatusChip, MetricCard } from '../../components/common/UIComponents';
 import { store } from '../../store/lawableStore';
+import { saveLawyerProfileToFirebase } from '../../services/firebaseService';
 
 // SCREEN 36 — LAWYER DASHBOARD
 export const LawyerDashboardPage = ({ navigate }) => {
@@ -288,48 +289,225 @@ export const LawyerProfilePage = ({ navigate }) => {
   const lawyer = (state.lawyerProfile) || lawyers.find(l => l.userId === currentUser.id) || {
     id: currentUser.id || 'lawyer-me',
     name: currentUser.name || 'Advocate',
+    designation: '',
+    experience: 0,
+    firm: '',
+    city: '',
+    state: '',
+    practiceAreas: [],
     barCouncilNo: '',
-    consultationFee: '',
-    bio: ''
+    courtsPracticedIn: [],
+    education: '',
+    certifications: '',
+    bio: '',
+    notableCases: '',
+    achievements: '',
+    publications: '',
+    languages: [],
+    consultationFee: 2000
   };
 
+  // 1. Basic Identity state (no avatar input as requested)
+  const [name, setName] = useState(lawyer.name || '');
+  const [designation, setDesignation] = useState(lawyer.designation || '');
+  const [experience, setExperience] = useState(lawyer.experience || 0);
+  const [firm, setFirm] = useState(lawyer.firm || '');
   const [fee, setFee] = useState(lawyer.consultationFee !== undefined && lawyer.consultationFee !== null ? lawyer.consultationFee : '');
-  const [bio, setBio] = useState(lawyer.bio || '');
+
+  // 2. Professional Credentials state
+  const [practiceAreas, setPracticeAreas] = useState(Array.isArray(lawyer.practiceAreas) ? lawyer.practiceAreas.join(', ') : (lawyer.practiceAreas || ''));
   const [barCouncilNo, setBarCouncilNo] = useState(lawyer.barCouncilNo || '');
+  const [courtsPracticedIn, setCourtsPracticedIn] = useState(Array.isArray(lawyer.courtsPracticedIn) ? lawyer.courtsPracticedIn.join(', ') : (lawyer.courtsPracticedIn || ''));
+  const [education, setEducation] = useState(lawyer.education || lawyer.qualification || '');
+  const [certifications, setCertifications] = useState(lawyer.certifications || '');
+
+  // 3. Experience & Track Record state
+  const [bio, setBio] = useState(lawyer.bio || '');
+  const [notableCases, setNotableCases] = useState(lawyer.notableCases || '');
+  const [achievements, setAchievements] = useState(lawyer.achievements || '');
+  const [publications, setPublications] = useState(lawyer.publications || '');
+  const [languages, setLanguages] = useState(Array.isArray(lawyer.languages) ? lawyer.languages.join(', ') : (lawyer.languages || ''));
 
   const handleSave = (e) => {
     e.preventDefault();
-    store.state.lawyerProfile = {
+    const updatedProfile = {
       ...lawyer,
-      barCouncilNo: barCouncilNo,
+      name,
+      designation,
+      experience: Number(experience) || 0,
+      firm,
       consultationFee: fee !== '' ? Number(fee) : 0,
-      bio: bio
+      practiceAreas: typeof practiceAreas === 'string' ? practiceAreas.split(',').map(s => s.trim()).filter(Boolean) : practiceAreas,
+      barCouncilNo,
+      courtsPracticedIn: typeof courtsPracticedIn === 'string' ? courtsPracticedIn.split(',').map(s => s.trim()).filter(Boolean) : courtsPracticedIn,
+      education,
+      certifications,
+      bio,
+      notableCases,
+      achievements,
+      publications,
+      languages: typeof languages === 'string' ? languages.split(',').map(s => s.trim()).filter(Boolean) : languages
     };
+
+    store.state.lawyerProfile = updatedProfile;
+
+    // Update in lawyers list if exists
+    const idx = store.state.lawyers.findIndex(l => l.id === lawyer.id || l.userId === currentUser.id);
+    if (idx !== -1) {
+      store.state.lawyers[idx] = { ...store.state.lawyers[idx], ...updatedProfile };
+    } else {
+      store.state.lawyers.unshift(updatedProfile);
+    }
+
+    // Direct write to Firebase Firestore
+    saveLawyerProfileToFirebase(updatedProfile).then((res) => {
+      if (res.success) {
+        store.addToast('Profile document saved & synced to Firebase Firestore!', 'success');
+      } else {
+        console.warn('Firebase sync warning:', res.error);
+      }
+    });
+
     store.notify();
-    store.addToast('Advocate profile updated successfully', 'success');
+    store.addToast('Advocate profile updated successfully with 3 complete sections', 'success');
     navigate('/app/lawyer');
   };
 
   return (
-    <div style={{ maxWidth: 760, margin: '0 auto' }}>
-      <Card padding="32px" style={{ backgroundColor: '#FFF' }}>
-        <h1 className="h2 mb-4">Marketplace Advocate Profile</h1>
-        <form onSubmit={handleSave}>
-          <div className="form-group">
-            <label className="form-label">Bar Council Enrolment Number</label>
-            <input type="text" className="form-input" value={barCouncilNo} onChange={(e) => setBarCouncilNo(e.target.value)} placeholder="e.g. MAH/2024/9182" />
+    <div style={{ maxWidth: 840, margin: '0 auto' }}>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <Badge variant="primary" className="mb-2">Advocate Credentials</Badge>
+          <h1 className="h2" style={{ margin: 0 }}>Manage Lawyer Profile</h1>
+          <p className="text-caption text-secondary mt-1">Configure your public marketplace profile divided into 3 professional sections.</p>
+        </div>
+        <Button variant="secondary" onClick={() => navigate('/app/lawyer')}>← Back to Dashboard</Button>
+      </div>
+
+      <form onSubmit={handleSave}>
+        {/* SECTION 1: BASIC IDENTITY */}
+        <Card className="mb-8" padding="32px" style={{ backgroundColor: '#FFF' }}>
+          <div className="flex items-center gap-3 mb-6 pb-4 border-b">
+            <User size={22} style={{ color: 'var(--color-primary)' }} />
+            <div>
+              <h2 className="h3" style={{ margin: 0 }}>1. Basic Identity</h2>
+              <p className="text-caption text-secondary mt-0.5">Name, title, professional designation, and experience level</p>
+            </div>
           </div>
-          <div className="form-group">
-            <label className="form-label">Consultation Fee (INR)</label>
-            <input type="number" className="form-input" value={fee} onChange={(e) => setFee(e.target.value)} placeholder="e.g. 2000" />
+
+          <div className="grid grid-2 gap-6 mb-6">
+            <div className="form-group">
+              <label className="form-label">Full Name (and Title)</label>
+              <input type="text" className="form-input" required value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Adv. Priya Malhotra, Senior Counsel" />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Designation / Position</label>
+              <input type="text" className="form-input" value={designation} onChange={(e) => setDesignation(e.target.value)} placeholder="e.g. Senior Partner, Founder, Managing Counsel" />
+            </div>
           </div>
+
+          <div className="grid grid-3 gap-6">
+            <div className="form-group">
+              <label className="form-label">Years of Experience</label>
+              <input type="number" className="form-input" min={0} value={experience} onChange={(e) => setExperience(e.target.value)} placeholder="e.g. 12" />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Law Firm / Chamber Name</label>
+              <input type="text" className="form-input" value={firm} onChange={(e) => setFirm(e.target.value)} placeholder="e.g. Malhotra & Associates Legal" />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Consultation Fee (INR)</label>
+              <input type="number" className="form-input" value={fee} onChange={(e) => setFee(e.target.value)} placeholder="e.g. 2500" />
+            </div>
+          </div>
+        </Card>
+
+        {/* SECTION 2: PROFESSIONAL CREDENTIALS */}
+        <Card className="mb-8" padding="32px" style={{ backgroundColor: '#FFF' }}>
+          <div className="flex items-center gap-3 mb-6 pb-4 border-b">
+            <Shield size={22} style={{ color: 'var(--color-primary)' }} />
+            <div>
+              <h2 className="h3" style={{ margin: 0 }}>2. Professional Credentials</h2>
+              <p className="text-caption text-secondary mt-0.5">Bar registration, practice specializations, courts, and degrees</p>
+            </div>
+          </div>
+
+          <div className="grid grid-2 gap-6 mb-6">
+            <div className="form-group">
+              <label className="form-label">Bar Council Enrolment ID / Reg Number</label>
+              <input type="text" className="form-input" required value={barCouncilNo} onChange={(e) => setBarCouncilNo(e.target.value)} placeholder="e.g. MAH/4521/2014" />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Practice Areas / Specializations (Comma Separated)</label>
+              <input type="text" className="form-input" value={practiceAreas} onChange={(e) => setPracticeAreas(e.target.value)} placeholder="e.g. Corporate Law, Contract Review, Cyber Law" />
+            </div>
+          </div>
+
           <div className="form-group mb-6">
-            <label className="form-label">Professional Bio</label>
-            <textarea className="form-textarea" rows={4} value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Describe your legal practice, court admissions, and advisory areas..." />
+            <label className="form-label">Courts Practiced In (Comma Separated)</label>
+            <input type="text" className="form-input" value={courtsPracticedIn} onChange={(e) => setCourtsPracticedIn(e.target.value)} placeholder="e.g. Supreme Court of India, High Court of Delhi, NCLT" />
           </div>
-          <Button type="submit">Save Profile Updates</Button>
-        </form>
-      </Card>
+
+          <div className="grid grid-2 gap-6">
+            <div className="form-group">
+              <label className="form-label">Education (Law School & Degrees)</label>
+              <input type="text" className="form-input" value={education} onChange={(e) => setEducation(e.target.value)} placeholder="e.g. LL.M (Corporate Law, NLSIU), B.A. LL.B" />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Certifications / Additional Qualifications</label>
+              <input type="text" className="form-input" value={certifications} onChange={(e) => setCertifications(e.target.value)} placeholder="e.g. CIPP/A Privacy Certified, Bar Mediator" />
+            </div>
+          </div>
+        </Card>
+
+        {/* SECTION 3: EXPERIENCE & TRACK RECORD */}
+        <Card className="mb-8" padding="32px" style={{ backgroundColor: '#FFF' }}>
+          <div className="flex items-center gap-3 mb-6 pb-4 border-b">
+            <FileText size={22} style={{ color: 'var(--color-primary)' }} />
+            <div>
+              <h2 className="h3" style={{ margin: 0 }}>3. Experience & Track Record</h2>
+              <p className="text-caption text-secondary mt-0.5">Professional summary, notable cases handled, awards, and publications</p>
+            </div>
+          </div>
+
+          <div className="form-group mb-6">
+            <label className="form-label">Short Professional Bio / Summary</label>
+            <textarea className="form-textarea" rows={3} value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Describe your background, expertise in commercial/civil law, and client focus..." />
+          </div>
+
+          <div className="form-group mb-6">
+            <label className="form-label">Notable Cases or Case Types Handled</label>
+            <textarea className="form-textarea" rows={2} value={notableCases} onChange={(e) => setNotableCases(e.target.value)} placeholder="Describe key matters or transaction types handled without breaching confidentiality..." />
+          </div>
+
+          <div className="grid grid-2 gap-6 mb-6">
+            <div className="form-group">
+              <label className="form-label">Key Achievements or Awards</label>
+              <input type="text" className="form-input" value={achievements} onChange={(e) => setAchievements(e.target.value)} placeholder="e.g. Ranked Top 40 Under 40 Corporate Lawyers (2024)" />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Languages Spoken (Comma Separated)</label>
+              <input type="text" className="form-input" value={languages} onChange={(e) => setLanguages(e.target.value)} placeholder="e.g. English, Hindi, Marathi" />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Publications, Articles, or Legal Commentary</label>
+            <input type="text" className="form-input" value={publications} onChange={(e) => setPublications(e.target.value)} placeholder="e.g. Author of 'DPDP Act Compliance Guide' (National Law Journal)" />
+          </div>
+        </Card>
+
+        <div className="flex justify-end gap-4 mb-12">
+          <Button variant="secondary" type="button" onClick={() => navigate('/app/lawyer')}>Cancel</Button>
+          <Button type="submit" size="lg">Save Profile Updates</Button>
+        </div>
+      </form>
     </div>
   );
 };

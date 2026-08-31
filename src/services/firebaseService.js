@@ -37,6 +37,17 @@ export async function registerUserWithFirebase(email, password, role = 'client',
     // Store profile document in Firestore `users` collection
     try {
       await setDoc(doc(db, 'users', user.uid), userProfile);
+      if (role === 'lawyer') {
+        const lawyerDoc = {
+          id: `lawyer-${user.uid}`,
+          userId: user.uid,
+          name: displayName,
+          email: user.email,
+          verificationStatus: 'verified',
+          createdAt: new Date().toISOString()
+        };
+        await setDoc(doc(db, 'lawyers', `lawyer-${user.uid}`), lawyerDoc);
+      }
     } catch (dbErr) {
       console.warn('Firestore setDoc failed (credentials may be needed):', dbErr.message);
     }
@@ -129,3 +140,26 @@ export async function getUserProfile(uid) {
     return null;
   }
 }
+
+/**
+ * Save / Update Lawyer Profile directly in Firebase Firestore `lawyers` collection.
+ */
+export async function saveLawyerProfileToFirebase(lawyerProfile) {
+  try {
+    const docId = lawyerProfile.id || lawyerProfile.userId || `lawyer-${Date.now()}`;
+    const docRef = doc(db, 'lawyers', docId);
+    const dataToSave = {
+      ...lawyerProfile,
+      id: docId,
+      verificationStatus: lawyerProfile.verificationStatus || 'verified',
+      updatedAt: new Date().toISOString()
+    };
+    await setDoc(docRef, dataToSave, { merge: true });
+    console.log(`✅ Lawyer profile saved to Firebase Firestore: ${docId}`);
+    return { success: true, id: docId, data: dataToSave };
+  } catch (error) {
+    console.error('Error saving lawyer profile to Firebase:', error);
+    return { success: false, error: error.message };
+  }
+}
+
