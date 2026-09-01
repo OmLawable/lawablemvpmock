@@ -328,7 +328,17 @@ export const BusinessDocumentVaultPage = ({ navigate }) => {
 
 // SCREEN 44 — CONTRACT REGISTER PAGE
 export const ContractRegisterPage = ({ navigate }) => {
-  const contracts = store.getState().contracts;
+  const [state, setState] = useState(store.getState());
+  const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => store.subscribe(setState), []);
+
+  const contracts = state.contracts || [];
+  const filtered = contracts.filter((c) => {
+    if (searchQuery && !c.title.toLowerCase().includes(searchQuery.toLowerCase()) && !c.counterparty.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    return true;
+  });
+
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto' }}>
       <div className="flex items-center justify-between mb-8">
@@ -340,7 +350,7 @@ export const ContractRegisterPage = ({ navigate }) => {
         <Button onClick={() => store.addToast('Contract added to register', 'success')}>+ Register New Contract</Button>
       </div>
 
-      {(contracts || []).length === 0 ? (
+      {(filtered || []).length === 0 ? (
         <Card padding="36px" className="text-center" style={{ backgroundColor: '#FFF' }}>
           <h3 className="h3 mb-2">No Contracts Registered</h3>
           <p className="text-secondary mb-4">Register your active commercial vendor agreements, leases, and NDAs to track renewal dates and statutory SLAs.</p>
@@ -348,7 +358,7 @@ export const ContractRegisterPage = ({ navigate }) => {
         </Card>
       ) : (
         <div className="grid grid-2 gap-6">
-          {(contracts || []).map((c) => (
+          {(filtered || []).map((c) => (
             <Card key={c.id} padding="28px" style={{ backgroundColor: '#FFF' }}>
               <div className="flex items-center justify-between mb-3">
                 <span style={{ fontWeight: 700, fontSize: 16 }}>{c.title}</span>
@@ -373,30 +383,37 @@ export const BusinessProfileEditor = ({ navigate, isFullPage = false }) => {
   useEffect(() => store.subscribe(setState), []);
 
   const user = state.currentUser || {};
-  const currentLogo = (state.businessProfile && state.businessProfile.logo) || user.avatar || '';
+  const isSameUser = state.businessProfile && (
+    !state.businessProfile.officialEmail || 
+    state.businessProfile.officialEmail === user.email ||
+    state.businessProfile.userId === user.id
+  );
+  const activeProfile = (isSameUser ? state.businessProfile : null) || {};
+  const currentLogo = activeProfile.logo || user.avatar || '';
 
-  const initial = state.businessProfile || {
+  const getInitialForm = () => ({
     logo: currentLogo,
-    companyName: user.name || '',
-    entityType: 'pvt_ltd',
-    cin: '',
-    gstin: '',
-    pan: '',
-    registeredAddress: '',
-    city: '',
-    state: '',
-    officialEmail: user.email || '',
-    phone: user.phone || '',
-    signatoryName: '',
-    signatoryDesignation: '',
-    employeeCount: '',
-    complianceScore: 0
-  };
-
-  const [formData, setFormData] = useState({
-    ...initial,
-    logo: (state.businessProfile && state.businessProfile.logo) || user.avatar || initial.logo || ''
+    companyName: activeProfile.companyName || user.companyName || user.name || '',
+    entityType: activeProfile.entityType || 'pvt_ltd',
+    cin: activeProfile.cin || '',
+    gstin: activeProfile.gstin || '',
+    pan: activeProfile.pan || '',
+    registeredAddress: activeProfile.registeredAddress || '',
+    city: activeProfile.city || '',
+    state: activeProfile.state || '',
+    officialEmail: activeProfile.officialEmail || user.email || '',
+    phone: activeProfile.phone || user.phone || '',
+    signatoryName: activeProfile.signatoryName || user.name || '',
+    signatoryDesignation: activeProfile.signatoryDesignation || '',
+    employeeCount: activeProfile.employeeCount || '',
+    complianceScore: activeProfile.complianceScore || 0
   });
+
+  const [formData, setFormData] = useState(getInitialForm);
+
+  useEffect(() => {
+    setFormData(getInitialForm());
+  }, [user.id, user.email, user.name, state.businessProfile]);
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));

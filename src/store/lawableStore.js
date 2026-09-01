@@ -21,44 +21,53 @@ class LawableStore {
       if (firebaseUser) {
         let profile = await getUserProfile(firebaseUser.uid);
         const logoUrl = (profile && (profile.logo || profile.avatar)) || '';
+        const userEmail = firebaseUser.email || (profile && profile.email) || '';
+        const userName = firebaseUser.displayName || (profile && profile.name) || userEmail.split('@')[0];
+
         this.state.currentUser = {
           id: firebaseUser.uid,
           uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          name: firebaseUser.displayName || (profile && profile.name) || firebaseUser.email.split('@')[0],
+          email: userEmail,
+          name: userName,
           role: (profile && profile.role) || (this.state.currentUser && this.state.currentUser.role) || 'client',
           avatar: logoUrl || (profile && profile.avatar) || (this.state.currentUser && this.state.currentUser.avatar) || '',
           emailVerified: firebaseUser.emailVerified,
           ...profile
         };
 
-        if (profile) {
-          this.state.businessProfile = {
-            ...(this.state.businessProfile || {}),
-            logo: logoUrl,
-            companyName: profile.companyName || profile.name || '',
-            entityType: profile.entityType || 'pvt_ltd',
-            cin: profile.cin || '',
-            gstin: profile.gstin || '',
-            pan: profile.pan || '',
-            registeredAddress: profile.registeredAddress || '',
-            city: profile.city || '',
-            state: profile.state || '',
-            officialEmail: profile.officialEmail || profile.email || '',
-            phone: profile.phone || '',
-            signatoryName: profile.signatoryName || '',
-            signatoryDesignation: profile.signatoryDesignation || '',
-            employeeCount: profile.employeeCount || '',
-            complianceScore: profile.complianceScore || 0,
-            ...(profile.businessProfile || {})
-          };
-        }
+        const isSameUser = this.state.businessProfile && (
+          this.state.businessProfile.officialEmail === userEmail || 
+          this.state.businessProfile.userId === firebaseUser.uid
+        );
+        const existingBiz = isSameUser ? this.state.businessProfile : {};
+
+        this.state.businessProfile = {
+          ...existingBiz,
+          userId: firebaseUser.uid,
+          logo: logoUrl || existingBiz.logo || '',
+          companyName: (profile && (profile.companyName || profile.name)) || (isSameUser ? existingBiz.companyName : userName) || userName,
+          entityType: (profile && profile.entityType) || existingBiz.entityType || 'pvt_ltd',
+          cin: (profile && profile.cin) || (isSameUser ? existingBiz.cin : '') || '',
+          gstin: (profile && profile.gstin) || (isSameUser ? existingBiz.gstin : '') || '',
+          pan: (profile && profile.pan) || (isSameUser ? existingBiz.pan : '') || '',
+          registeredAddress: (profile && profile.registeredAddress) || (isSameUser ? existingBiz.registeredAddress : '') || '',
+          city: (profile && profile.city) || (isSameUser ? existingBiz.city : '') || '',
+          state: (profile && profile.state) || (isSameUser ? existingBiz.state : '') || '',
+          officialEmail: (profile && (profile.officialEmail || profile.email)) || userEmail,
+          phone: (profile && profile.phone) || (isSameUser ? existingBiz.phone : '') || '',
+          signatoryName: (profile && (profile.signatoryName || profile.name)) || (isSameUser ? existingBiz.signatoryName : userName) || userName,
+          signatoryDesignation: (profile && profile.signatoryDesignation) || (isSameUser ? existingBiz.signatoryDesignation : '') || '',
+          employeeCount: (profile && profile.employeeCount) || (isSameUser ? existingBiz.employeeCount : '') || '',
+          complianceScore: (profile && profile.complianceScore) || (isSameUser ? existingBiz.complianceScore : 0) || 0,
+          ...(profile && profile.businessProfile ? profile.businessProfile : {})
+        };
 
         this.notify();
       } else {
         // Clear any old mock session if Firebase has no logged-in user
         if (this.state.currentUser && this.state.currentUser.id === 'user-001') {
           this.state.currentUser = null;
+          this.state.businessProfile = null;
           this.notify();
         }
       }
@@ -219,7 +228,43 @@ class LawableStore {
   }
 
   setCurrentUser(userData) {
-    this.state.currentUser = userData ? { ...(this.state.currentUser || {}), ...userData } : null;
+    if (!userData) {
+      this.state.currentUser = null;
+      this.state.businessProfile = null;
+    } else {
+      this.state.currentUser = { ...(this.state.currentUser || {}), ...userData };
+      
+      const userEmail = userData.email || (this.state.currentUser && this.state.currentUser.email) || '';
+      const userName = userData.companyName || userData.name || (this.state.currentUser && this.state.currentUser.name) || (userEmail ? userEmail.split('@')[0] : '');
+      const uid = userData.id || userData.uid || (this.state.currentUser && this.state.currentUser.id) || '';
+      
+      const isSameUser = this.state.businessProfile && (
+        (userEmail && this.state.businessProfile.officialEmail === userEmail) ||
+        (uid && this.state.businessProfile.userId === uid)
+      );
+      const existingBiz = isSameUser ? this.state.businessProfile : {};
+
+      this.state.businessProfile = {
+        ...existingBiz,
+        userId: uid,
+        logo: userData.avatar || userData.logo || existingBiz.logo || '',
+        companyName: userData.companyName || (isSameUser ? existingBiz.companyName : userName) || userName,
+        entityType: userData.entityType || existingBiz.entityType || 'pvt_ltd',
+        cin: userData.cin || (isSameUser ? existingBiz.cin : '') || '',
+        gstin: userData.gstin || (isSameUser ? existingBiz.gstin : '') || '',
+        pan: userData.pan || (isSameUser ? existingBiz.pan : '') || '',
+        registeredAddress: userData.registeredAddress || (isSameUser ? existingBiz.registeredAddress : '') || '',
+        city: userData.city || (isSameUser ? existingBiz.city : '') || '',
+        state: userData.state || (isSameUser ? existingBiz.state : '') || '',
+        officialEmail: userEmail || existingBiz.officialEmail || '',
+        phone: userData.phone || (isSameUser ? existingBiz.phone : '') || '',
+        signatoryName: userData.signatoryName || (isSameUser ? existingBiz.signatoryName : userName) || userName,
+        signatoryDesignation: userData.signatoryDesignation || (isSameUser ? existingBiz.signatoryDesignation : '') || '',
+        employeeCount: userData.employeeCount || (isSameUser ? existingBiz.employeeCount : '') || '',
+        complianceScore: userData.complianceScore || (isSameUser ? existingBiz.complianceScore : 0) || 0,
+        ...(userData.businessProfile || {})
+      };
+    }
     this.notify();
   }
 
@@ -230,6 +275,7 @@ class LawableStore {
       console.warn('Firebase logout notice:', e);
     }
     this.state.currentUser = null;
+    this.state.businessProfile = null;
     ['lawable_state_v1', 'lawable_state_v2', 'lawable_state_v3', 'lawable_state_v4'].forEach(k => localStorage.removeItem(k));
     this.addToast('Logged out successfully', 'info');
     this.notify();
