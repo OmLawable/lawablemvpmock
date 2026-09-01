@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, Settings, Bell, Shield, Download, Trash2, CheckCircle, Sparkles, BookOpen, Clock, FileText, ArrowRight, Award, Plus, ShoppingBag } from 'lucide-react';
 import { Card, Button, Badge, ConfirmationDialog, MetricCard, StatusChip } from '../../components/common/UIComponents';
 import { store } from '../../store/lawableStore';
+import { BusinessProfileEditor } from '../business/BusinessPages';
 
 // CLIENT / INDIVIDUAL DASHBOARD (CENTER ALIGNED HEADER & BALANCED SPACING)
 export const ClientDashboardPage = ({ navigate }) => {
@@ -159,12 +160,18 @@ export const StudentDashboardPage = ({ navigate }) => {
   );
 };
 
-// USER PROFILE
+// USER / BUSINESS PROFILE
 export const ProfilePage = ({ navigate }) => {
   const [state, setState] = useState(store.getState());
   useEffect(() => store.subscribe(setState), []);
 
   const user = state.currentUser || { name: '', email: '', role: 'client', phone: '' };
+
+  // If active role is business, render the dedicated Business Profile Editor
+  if (user.role === 'business') {
+    return <BusinessProfileEditor navigate={navigate} isFullPage={false} />;
+  }
+
   const [name, setName] = useState(user.name || '');
   const [phone, setPhone] = useState(user.phone || '');
 

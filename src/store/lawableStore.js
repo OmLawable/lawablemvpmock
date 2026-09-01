@@ -1,7 +1,7 @@
 import { INITIAL_DATA } from './initialData';
 import { auth } from '../config/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { getUserProfile, logoutUserWithFirebase } from '../services/firebaseService';
+import { getUserProfile, updateUserProfileInFirestore, logoutUserWithFirebase } from '../services/firebaseService';
 import { seedInitialDataToFirestore } from '../services/seedFirebase';
 
 class LawableStore {
@@ -20,14 +20,40 @@ class LawableStore {
     onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         let profile = await getUserProfile(firebaseUser.uid);
+        const logoUrl = (profile && (profile.logo || profile.avatar)) || '';
         this.state.currentUser = {
           id: firebaseUser.uid,
           uid: firebaseUser.uid,
           email: firebaseUser.email,
           name: firebaseUser.displayName || (profile && profile.name) || firebaseUser.email.split('@')[0],
           role: (profile && profile.role) || (this.state.currentUser && this.state.currentUser.role) || 'client',
-          emailVerified: firebaseUser.emailVerified
+          avatar: logoUrl || (profile && profile.avatar) || (this.state.currentUser && this.state.currentUser.avatar) || '',
+          emailVerified: firebaseUser.emailVerified,
+          ...profile
         };
+
+        if (profile) {
+          this.state.businessProfile = {
+            ...(this.state.businessProfile || {}),
+            logo: logoUrl,
+            companyName: profile.companyName || profile.name || '',
+            entityType: profile.entityType || 'pvt_ltd',
+            cin: profile.cin || '',
+            gstin: profile.gstin || '',
+            pan: profile.pan || '',
+            registeredAddress: profile.registeredAddress || '',
+            city: profile.city || '',
+            state: profile.state || '',
+            officialEmail: profile.officialEmail || profile.email || '',
+            phone: profile.phone || '',
+            signatoryName: profile.signatoryName || '',
+            signatoryDesignation: profile.signatoryDesignation || '',
+            employeeCount: profile.employeeCount || '',
+            complianceScore: profile.complianceScore || 0,
+            ...(profile.businessProfile || {})
+          };
+        }
+
         this.notify();
       } else {
         // Clear any old mock session if Firebase has no logged-in user
@@ -127,9 +153,68 @@ class LawableStore {
     this.notify();
   }
 
-  updateProfile(profileData) {
+  async updateProfile(profileData) {
     this.state.currentUser = { ...(this.state.currentUser || {}), ...profileData };
+    const uid = this.state.currentUser && (this.state.currentUser.uid || this.state.currentUser.id);
+    if (uid) {
+      try {
+        await updateUserProfileInFirestore(uid, {
+          ...profileData,
+          updatedAt: new Date().toISOString()
+        });
+      } catch (e) {
+        console.warn('Could not sync user profile to Firestore:', e);
+      }
+    }
     this.addToast('Profile details updated successfully', 'success');
+    this.notify();
+  }
+
+  async updateBusinessProfile(profileData) {
+    const logoUrl = profileData.logo !== undefined ? profileData.logo : (this.state.businessProfile?.logo || '');
+    this.state.businessProfile = {
+      ...(this.state.businessProfile || {}),
+      ...profileData,
+      logo: logoUrl
+    };
+    if (this.state.currentUser) {
+      if (profileData.companyName) {
+        this.state.currentUser.name = profileData.companyName;
+      }
+      this.state.currentUser = {
+        ...this.state.currentUser,
+        ...profileData,
+        avatar: logoUrl || this.state.currentUser.avatar || ''
+      };
+
+      const uid = this.state.currentUser.uid || this.state.currentUser.id;
+      if (uid) {
+        const firestoreData = {
+          name: profileData.companyName || profileData.name || this.state.currentUser.name || '',
+          email: profileData.officialEmail || profileData.email || this.state.currentUser.email || '',
+          phone: profileData.phone || this.state.currentUser.phone || '',
+          logo: logoUrl,
+          avatar: logoUrl,
+          entityType: profileData.entityType || 'pvt_ltd',
+          cin: profileData.cin || '',
+          gstin: profileData.gstin || '',
+          pan: profileData.pan || '',
+          registeredAddress: profileData.registeredAddress || '',
+          city: profileData.city || '',
+          state: profileData.state || '',
+          signatoryName: profileData.signatoryName || '',
+          signatoryDesignation: profileData.signatoryDesignation || '',
+          employeeCount: profileData.employeeCount || '',
+          updatedAt: new Date().toISOString()
+        };
+        try {
+          await updateUserProfileInFirestore(uid, firestoreData);
+        } catch (e) {
+          console.warn('Could not sync business profile to Firestore:', e);
+        }
+      }
+    }
+    this.addToast('Business profile updated successfully', 'success');
     this.notify();
   }
 

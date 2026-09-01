@@ -577,3 +577,12 @@ a:hover {
   .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
   .card { padding: var(--space-5); }
 }
+
+.logo-uploader-box:hover .logo-hover-overlay {
+  opacity: 1 !important;
+}
+
+.logo-uploader-box:hover {
+  border-color: var(--color-primary) !important;
+  transform: translateY(-1px);
+}

@@ -191,12 +191,25 @@ export const AppShell = ({ children, currentRoute, navigate }) => {
           <div
             className="flex items-center gap-3 p-2 rounded-md hover:bg-muted"
             style={{ cursor: 'pointer', borderRadius: 'var(--radius-md)' }}
-            onClick={() => navigate('/app/profile')}
+            onClick={() => navigate(currentUser.role === 'business' ? '/app/business/profile' : '/app/profile')}
           >
-            {currentUser.avatar ? (
-              <img src={currentUser.avatar} alt="Avatar" style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover' }} />
+            {(currentUser.avatar || (currentState.businessProfile && currentState.businessProfile.logo)) ? (
+              <img 
+                src={currentUser.avatar || (currentState.businessProfile && currentState.businessProfile.logo)} 
+                alt="Logo/Avatar" 
+                style={{ 
+                  width: 38, 
+                  height: 38, 
+                  borderRadius: currentUser.role === 'business' ? '8px' : '50%', 
+                  objectFit: 'contain',
+                  backgroundColor: '#FFFFFF',
+                  border: '1px solid var(--color-border)',
+                  padding: currentUser.role === 'business' ? 2 : 0,
+                  flexShrink: 0
+                }} 
+              />
             ) : (
-              <div style={{ width: 38, height: 38, borderRadius: '50%', backgroundColor: 'var(--color-primary)', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
+              <div style={{ width: 38, height: 38, borderRadius: currentUser.role === 'business' ? '8px' : '50%', backgroundColor: 'var(--color-primary)', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
                 {userInitial}
               </div>
             )}

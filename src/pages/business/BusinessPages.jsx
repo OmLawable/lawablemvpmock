@@ -1,18 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Building2, ShieldCheck, AlertTriangle, CheckSquare, Clock, FileText, ArrowRight, 
-  Upload, FileCode, CheckCircle, ExternalLink, RefreshCw, Plus, Edit, Lock, Search
+  Upload, FileCode, CheckCircle, ExternalLink, RefreshCw, Plus, Edit, Lock, Search,
+  User, Mail, Phone, Globe, MapPin, Hash, Briefcase, Landmark, Users, Award, Scale, HelpCircle,
+  Camera, Trash2, Image, Sparkles, Check, Link, Eye, Download, ZoomIn
 } from 'lucide-react';
-import { Card, Button, Badge, StatusChip, SearchInput } from '../../components/common/UIComponents';
+import { Card, Button, Badge, StatusChip, SearchInput, Modal } from '../../components/common/UIComponents';
 import { store } from '../../store/lawableStore';
 
 // SCREEN 41 — BUSINESS DASHBOARD
 export const BusinessDashboardPage = ({ navigate }) => {
   const [state, setState] = useState(store.getState());
+  const [viewLogoModal, setViewLogoModal] = useState(false);
   useEffect(() => store.subscribe(setState), []);
 
   const user = state.currentUser || {};
   const profile = state.businessProfile || {
+    logo: user.avatar || '',
     companyName: user.name || 'Business Workspace',
     entityType: 'pvt_ltd',
     cin: 'Not Set',
@@ -42,14 +46,85 @@ export const BusinessDashboardPage = ({ navigate }) => {
   const labourStats = getAreaStats('labour_law');
   const dpdpStats = getAreaStats('dpdp');
 
+  const displayLogo = profile.logo || user.avatar || '';
+
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+      {/* View Full Size Logo Modal on Dashboard */}
+      {viewLogoModal && displayLogo && (
+        <Modal title={`Company Logo — ${profile.companyName || 'Business'}`} onClose={() => setViewLogoModal(false)} maxWidth={580}>
+          <div className="flex flex-col items-center">
+            <div style={{
+              width: '100%',
+              maxHeight: 400,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#F8FAFC',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-md)',
+              padding: 24,
+              overflow: 'hidden'
+            }}>
+              <img 
+                src={displayLogo} 
+                alt="Company Logo Full Size" 
+                style={{ maxWidth: '100%', maxHeight: 350, objectFit: 'contain', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }} 
+              />
+            </div>
+            <div className="flex items-center justify-between w-full mt-6 pt-4 border-t" style={{ borderColor: 'var(--color-border)' }}>
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                onClick={() => {
+                  setViewLogoModal(false);
+                  navigate('/app/business/profile');
+                }}
+                className="flex items-center gap-1.5"
+              >
+                <Edit size={14} /> Edit in Profile
+              </Button>
+              <Button variant="primary" size="sm" onClick={() => setViewLogoModal(false)}>Close</Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
       {/* Company Header */}
       <div className="flex items-center justify-between mb-8">
-        <div>
-          <Badge variant="primary" className="mb-2">{(profile.entityType || 'pvt_ltd').replace('_', ' ').toUpperCase()} • {profile.state || 'India'}</Badge>
-          <h1 className="h2" style={{ margin: 0 }}>{profile.companyName}</h1>
-          <p className="text-caption text-secondary mt-1">CIN: {profile.cin} • GSTIN: {profile.gstin}</p>
+        <div className="flex items-center gap-4">
+          <div 
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: '14px',
+              backgroundColor: displayLogo ? '#FFFFFF' : 'var(--color-primary-light)',
+              color: 'var(--color-primary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 700,
+              fontSize: 22,
+              border: '1px solid var(--color-border)',
+              overflow: 'hidden',
+              flexShrink: 0,
+              boxShadow: 'var(--shadow-sm)',
+              cursor: displayLogo ? 'pointer' : 'default'
+            }}
+            onClick={() => displayLogo && setViewLogoModal(true)}
+            title={displayLogo ? 'Click to view full size logo' : ''}
+          >
+            {displayLogo ? (
+              <img src={displayLogo} alt={profile.companyName} style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 2 }} />
+            ) : (
+              <Building2 size={32} />
+            )}
+          </div>
+          <div>
+            <Badge variant="primary" className="mb-2">{(profile.entityType || 'pvt_ltd').replace('_', ' ').toUpperCase()} • {profile.state || 'India'}</Badge>
+            <h1 className="h2" style={{ margin: 0 }}>{profile.companyName}</h1>
+            <p className="text-caption text-secondary mt-1">CIN: {profile.cin} • GSTIN: {profile.gstin}</p>
+          </div>
         </div>
         <Button variant="secondary" onClick={() => navigate('/app/business/profile')}>Edit Business Profile</Button>
       </div>
@@ -289,57 +364,521 @@ export const ContractRegisterPage = ({ navigate }) => {
   );
 };
 
-// SCREEN 45 — BUSINESS PROFILE PAGE
-export const BusinessProfilePage = ({ navigate }) => {
-  const state = store.getState();
+// SCREEN 45 — BUSINESS PROFILE COMPONENT / EDITOR
+export const BusinessProfileEditor = ({ navigate, isFullPage = false }) => {
+  const [state, setState] = useState(store.getState());
+  const fileInputRef = useRef(null);
+  const [viewLogoModal, setViewLogoModal] = useState(false);
+
+  useEffect(() => store.subscribe(setState), []);
+
   const user = state.currentUser || {};
-  const profile = state.businessProfile || {
-    companyName: user.name || 'My Enterprise Legal Entity',
-    gstin: '',
-    cin: '',
+  const currentLogo = (state.businessProfile && state.businessProfile.logo) || user.avatar || '';
+
+  const initial = state.businessProfile || {
+    logo: currentLogo,
+    companyName: user.name || '',
     entityType: 'pvt_ltd',
-    state: 'Maharashtra',
-    city: 'Mumbai',
-    employeeCount: 1,
-    complianceScore: 100
+    cin: '',
+    gstin: '',
+    pan: '',
+    registeredAddress: '',
+    city: '',
+    state: '',
+    officialEmail: user.email || '',
+    phone: user.phone || '',
+    signatoryName: '',
+    signatoryDesignation: '',
+    employeeCount: '',
+    complianceScore: 0
   };
-  const [cName, setCName] = useState(profile.companyName || '');
-  const [gst, setGst] = useState(profile.gstin || '');
-  const [cin, setCin] = useState(profile.cin || '');
+
+  const [formData, setFormData] = useState({
+    ...initial,
+    logo: (state.businessProfile && state.businessProfile.logo) || user.avatar || initial.logo || ''
+  });
+
+  const handleChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      store.addToast('Logo file size must be under 10MB', 'danger');
+      if (e.target) e.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result;
+      handleChange('logo', base64);
+      store.addToast('Company logo uploaded. Click "Update Business Profile" to save.', 'info');
+      if (e.target) e.target.value = '';
+    };
+    reader.onerror = () => {
+      store.addToast('Error reading image file', 'danger');
+      if (e.target) e.target.value = '';
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveLogo = () => {
+    handleChange('logo', '');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    store.addToast('Logo removed. Save to apply changes.', 'info');
+  };
 
   const handleSave = (e) => {
-    e.preventDefault();
-    store.state.businessProfile = {
-      ...profile,
-      companyName: cName,
-      gstin: gst,
-      cin: cin
-    };
-    store.addToast('Business profile updated successfully', 'success');
-    store.notify();
-    navigate('/app/business');
+    if (e) e.preventDefault();
+    store.updateBusinessProfile(formData);
+    if (navigate && isFullPage) {
+      navigate('/app/business');
+    }
   };
 
   return (
-    <div style={{ maxWidth: 760, margin: '0 auto' }}>
-      <Card padding="32px" style={{ backgroundColor: '#FFF' }}>
-        <h1 className="h2 mb-4">Edit Business Entity Profile</h1>
+    <div style={{ maxWidth: 840, margin: '0 auto' }}>
+      {/* Full-Size Logo Viewer Modal */}
+      {viewLogoModal && formData.logo && (
+        <Modal 
+          title={`Company Logo Preview — ${formData.companyName || 'Business'}`} 
+          onClose={() => setViewLogoModal(false)} 
+          maxWidth={620}
+        >
+          <div className="flex flex-col items-center">
+            <div style={{
+              width: '100%',
+              minHeight: 280,
+              maxHeight: 460,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#F8FAFC',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-md)',
+              padding: 24,
+              overflow: 'hidden'
+            }}>
+              <img 
+                src={formData.logo} 
+                alt="Company Logo Full Preview" 
+                style={{ 
+                  maxWidth: '100%', 
+                  maxHeight: 400, 
+                  objectFit: 'contain', 
+                  borderRadius: '8px', 
+                  boxShadow: '0 8px 24px rgba(15, 23, 42, 0.1)' 
+                }} 
+              />
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-between w-full mt-6 pt-4 border-t gap-3" style={{ borderColor: 'var(--color-border)' }}>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    fileInputRef.current?.click();
+                    setViewLogoModal(false);
+                  }}
+                  className="flex items-center gap-1.5"
+                >
+                  <Upload size={14} /> Replace Logo
+                </Button>
+
+                <a
+                  href={formData.logo}
+                  download={`${(formData.companyName || 'company').toLowerCase().replace(/\s+/g, '_')}_logo`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-ghost btn-sm flex items-center gap-1.5 text-secondary"
+                >
+                  <ExternalLink size={14} /> Open in New Tab
+                </a>
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    handleRemoveLogo();
+                    setViewLogoModal(false);
+                  }}
+                  style={{ color: 'var(--color-danger)' }}
+                  className="flex items-center gap-1.5"
+                >
+                  <Trash2 size={14} /> Remove
+                </Button>
+              </div>
+
+              <Button type="button" variant="primary" size="sm" onClick={() => setViewLogoModal(false)}>
+                Done
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      <Card padding="36px" style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)' }}>
+        {/* Header with Interactive Company Logo */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 mb-8 border-b">
+          <div className="flex items-center gap-4">
+            {/* Interactive Logo Avatar */}
+            <div 
+              className="logo-uploader-box"
+              style={{
+                position: 'relative',
+                width: 68,
+                height: 68,
+                borderRadius: '16px',
+                backgroundColor: formData.logo ? '#FFFFFF' : 'var(--color-primary-light)',
+                color: 'var(--color-primary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 700,
+                fontSize: 24,
+                border: '2px solid var(--color-border)',
+                overflow: 'hidden',
+                flexShrink: 0,
+                cursor: 'pointer',
+                boxShadow: 'var(--shadow-sm)',
+                transition: 'all 0.2s ease'
+              }}
+              onClick={() => {
+                if (formData.logo) {
+                  setViewLogoModal(true);
+                } else {
+                  fileInputRef.current?.click();
+                }
+              }}
+              title={formData.logo ? 'Click to view full size logo' : 'Click to upload company logo'}
+            >
+              {formData.logo ? (
+                <img 
+                  src={formData.logo} 
+                  alt="Company Logo" 
+                  style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 4 }} 
+                />
+              ) : (
+                <Building2 size={32} />
+              )}
+              
+              <div
+                className="logo-hover-overlay"
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  backgroundColor: 'rgba(15, 23, 42, 0.65)',
+                  color: '#FFFFFF',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: 0,
+                  transition: 'opacity 0.2s',
+                  fontSize: 10,
+                  fontWeight: 600,
+                  gap: 2
+                }}
+              >
+                {formData.logo ? (
+                  <>
+                    <Eye size={18} />
+                    <span>View</span>
+                  </>
+                ) : (
+                  <>
+                    <Camera size={18} />
+                    <span>Upload</span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <h1 className="h2" style={{ margin: 0, fontSize: 24 }}>{formData.companyName || 'Business Profile'}</h1>
+              <p className="text-caption text-secondary mt-1">
+                {(formData.entityType || 'pvt_ltd').replace(/_/g, ' ').toUpperCase()} • {formData.city || formData.state || 'Location Not Set'}
+              </p>
+            </div>
+          </div>
+          <Badge variant="neutral">Draft Profile</Badge>
+        </div>
+
+        {/* Hidden File Input (Accepts all image types) */}
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          accept="image/*, .webp, .png, .jpg, .jpeg, .svg, .gif, .avif, .bmp, .ico, .jfif, .pjpeg, .pjp" 
+          style={{ display: 'none' }} 
+          onChange={handleFileUpload} 
+        />
+
+        {/* Form */}
         <form onSubmit={handleSave}>
-          <div className="form-group">
-            <label className="form-label">Company Legal Name</label>
-            <input type="text" className="form-input" required value={cName} onChange={(e) => setCName(e.target.value)} placeholder="e.g. Acme Tech Pvt Ltd" />
+          {/* SECTION 0: Brand & Profile Logo Management */}
+          <div className="mb-8 p-5 rounded-lg border" style={{ backgroundColor: 'var(--color-bg-surface-muted)', borderColor: 'var(--color-border)' }}>
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div 
+                  style={{
+                    width: 58,
+                    height: 58,
+                    borderRadius: '12px',
+                    backgroundColor: formData.logo ? '#FFFFFF' : 'var(--color-bg-surface)',
+                    border: '1px solid var(--color-border)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                    flexShrink: 0,
+                    cursor: formData.logo ? 'pointer' : 'default'
+                  }}
+                  onClick={() => formData.logo && setViewLogoModal(true)}
+                  title={formData.logo ? 'Click to view full size logo' : ''}
+                >
+                  {formData.logo ? (
+                    <img src={formData.logo} alt="Logo Preview" style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 4 }} />
+                  ) : (
+                    <Building2 size={26} style={{ color: 'var(--color-text-muted)' }} />
+                  )}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--color-text-primary)' }}>Company Profile Logo</div>
+                  <div className="text-caption text-secondary mt-0.5">Add your official corporate logo. It appears on your dashboard, vault, and sidebar.</div>
+                  <div className="text-caption text-muted mt-0.5">All formats supported (WEBP, PNG, JPG, SVG, GIF, AVIF, BMP). Max 10MB.</div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                {formData.logo && (
+                  <Button 
+                    type="button" 
+                    variant="secondary" 
+                    size="sm" 
+                    onClick={() => setViewLogoModal(true)}
+                    className="flex items-center gap-1.5"
+                  >
+                    <Eye size={14} />
+                    View Logo
+                  </Button>
+                )}
+
+                <Button 
+                  type="button" 
+                  variant="secondary" 
+                  size="sm" 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-1.5"
+                >
+                  <Upload size={14} />
+                  {formData.logo ? 'Change Logo' : 'Upload Logo'}
+                </Button>
+
+                {formData.logo && (
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={handleRemoveLogo}
+                    style={{ color: 'var(--color-danger)' }}
+                    className="flex items-center gap-1"
+                  >
+                    <Trash2 size={14} />
+                    Remove
+                  </Button>
+                )}
+              </div>
+            </div>
           </div>
-          <div className="form-group">
-            <label className="form-label">GSTIN Number</label>
-            <input type="text" className="form-input" value={gst} onChange={(e) => setGst(e.target.value)} placeholder="e.g. 27AABCN8912P1ZD" />
+
+          {/* SECTION 1: Company Identity & Tax */}
+          <div className="mb-8">
+            <h3 className="h4 mb-4 text-primary" style={{ color: 'var(--color-primary)' }}>1. Corporate & Tax Identification</h3>
+            <div className="grid grid-2 gap-4">
+              <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                <label className="form-label">Company Legal Name</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  required
+                  value={formData.companyName}
+                  onChange={(e) => handleChange('companyName', e.target.value)}
+                  placeholder="e.g. LegalEdge Enterprises Pvt Ltd"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Entity Type</label>
+                <select
+                  className="form-select"
+                  value={formData.entityType}
+                  onChange={(e) => handleChange('entityType', e.target.value)}
+                >
+                  <option value="pvt_ltd">Private Limited (Pvt Ltd)</option>
+                  <option value="llp">Limited Liability Partnership (LLP)</option>
+                  <option value="opc">One Person Company (OPC)</option>
+                  <option value="sole_proprietorship">Sole Proprietorship</option>
+                  <option value="partnership">Partnership Firm</option>
+                  <option value="public_ltd">Public Limited</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Corporate Identification Number (CIN / LLPIN)</label>
+                <input
+                  type="text"
+                  className="form-input font-mono"
+                  value={formData.cin}
+                  onChange={(e) => handleChange('cin', e.target.value)}
+                  placeholder="e.g. U72900MH2022PTC381920"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">GSTIN Number</label>
+                <input
+                  type="text"
+                  className="form-input font-mono"
+                  value={formData.gstin}
+                  onChange={(e) => handleChange('gstin', e.target.value)}
+                  placeholder="e.g. 27AABCL1234F1Z5"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Company PAN</label>
+                <input
+                  type="text"
+                  className="form-input font-mono"
+                  value={formData.pan || ''}
+                  onChange={(e) => handleChange('pan', e.target.value.toUpperCase())}
+                  placeholder="e.g. AABCL1234F"
+                  maxLength={10}
+                />
+              </div>
+            </div>
           </div>
-          <div className="form-group">
-            <label className="form-label">Corporate Identification Number (CIN)</label>
-            <input type="text" className="form-input" value={cin} onChange={(e) => setCin(e.target.value)} placeholder="e.g. U72900MH2024PTC392810" />
+
+          {/* SECTION 2: Registered Location & Contacts */}
+          <div className="mb-8 pt-6 border-t">
+            <h3 className="h4 mb-4 text-primary" style={{ color: 'var(--color-primary)' }}>2. Registered Office & Official Contacts</h3>
+            <div className="grid grid-2 gap-4">
+              <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                <label className="form-label">Registered Office Address</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={formData.registeredAddress || ''}
+                  onChange={(e) => handleChange('registeredAddress', e.target.value)}
+                  placeholder="e.g. Suite 502, Prestige Tech Tower, BKC"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">City</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={formData.city}
+                  onChange={(e) => handleChange('city', e.target.value)}
+                  placeholder="e.g. Mumbai"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">State</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={formData.state}
+                  onChange={(e) => handleChange('state', e.target.value)}
+                  placeholder="e.g. Maharashtra"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Official Legal Email</label>
+                <input
+                  type="email"
+                  className="form-input"
+                  value={formData.officialEmail || ''}
+                  onChange={(e) => handleChange('officialEmail', e.target.value)}
+                  placeholder="e.g. legal@legaledge.com"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Phone Number</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={formData.phone || ''}
+                  onChange={(e) => handleChange('phone', e.target.value)}
+                  placeholder="e.g. +91 98765 43210"
+                />
+              </div>
+            </div>
           </div>
-          <Button type="submit" className="mt-4">Save Profile Changes</Button>
+
+          {/* SECTION 3: Signatory & Workforce */}
+          <div className="mb-8 pt-6 border-t">
+            <h3 className="h4 mb-4 text-primary" style={{ color: 'var(--color-primary)' }}>3. Authorized Signatory & Workforce</h3>
+            <div className="grid grid-2 gap-4">
+              <div className="form-group">
+                <label className="form-label">Authorized Signatory Name</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={formData.signatoryName || ''}
+                  onChange={(e) => handleChange('signatoryName', e.target.value)}
+                  placeholder="e.g. Sarthak Kadam"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Signatory Designation</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={formData.signatoryDesignation || ''}
+                  onChange={(e) => handleChange('signatoryDesignation', e.target.value)}
+                  placeholder="e.g. Managing Director"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Total Employee Count</label>
+                <input
+                  type="number"
+                  min="1"
+                  className="form-input"
+                  value={formData.employeeCount || ''}
+                  onChange={(e) => handleChange('employeeCount', e.target.value)}
+                  placeholder="e.g. 15"
+                />
+                <span className="text-caption text-secondary mt-1">Used for statutory POSH (10+) and PF (20+) compliance checks.</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t flex justify-end">
+            <Button type="submit">Update Business Profile</Button>
+          </div>
         </form>
       </Card>
     </div>
   );
 };
+
+// SCREEN 45 — BUSINESS PROFILE PAGE WRAPPER
+export const BusinessProfilePage = ({ navigate }) => {
+  return <BusinessProfileEditor navigate={navigate} isFullPage={true} />;
+};
+

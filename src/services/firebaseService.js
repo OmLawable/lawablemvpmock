@@ -6,7 +6,7 @@ import {
   sendPasswordResetEmail,
   updateProfile
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, deleteField } from 'firebase/firestore';
 
 /**
  * Register a new user with Firebase Auth and store user profile & role in Firestore.
@@ -127,5 +127,47 @@ export async function getUserProfile(uid) {
   } catch (error) {
     console.warn('Error fetching user profile:', error.message);
     return null;
+  }
+}
+
+/**
+ * Update / Merge User Profile Document in Firestore and clean legacy fields
+ */
+export async function updateUserProfileInFirestore(uid, data) {
+  try {
+    const userDocRef = doc(db, 'users', uid);
+    
+    // Explicitly delete any duplicate or obsolete fields from Firestore
+    await updateDoc(userDocRef, {
+      ...data,
+      companyName: deleteField(),
+      officialEmail: deleteField(),
+      businessProfile: deleteField(),
+      pincode: deleteField(),
+      tan: deleteField(),
+      dpiitNumber: deleteField(),
+      udyamNumber: deleteField(),
+      tradeName: deleteField(),
+      billingEmail: deleteField(),
+      website: deleteField(),
+      incorporationDate: deleteField(),
+      industry: deleteField(),
+      signatoryDin: deleteField(),
+      dpoName: deleteField(),
+      dpoEmail: deleteField(),
+      jurisdictionCity: deleteField(),
+      turnoverBracket: deleteField(),
+      hasPoshCommittee: deleteField()
+    });
+    return { success: true };
+  } catch (error) {
+    try {
+      const userDocRef = doc(db, 'users', uid);
+      await setDoc(userDocRef, data, { merge: true });
+      return { success: true };
+    } catch (setErr) {
+      console.error('Error updating user profile in Firestore:', setErr);
+      return { success: false, error: setErr.message };
+    }
   }
 }
