@@ -331,24 +331,32 @@ export const PublicMarketplacePage = ({ navigate, lawyerId, serviceId }) => {
   const [search, setSearch] = useState('');
   const [selectedCat, setSelectedCat] = useState('all');
 
-  // Advocate Profile Detail Page
+  // Advocate Profile Detail Page with 3 Distinct Sections
   if (lawyerId) {
     const lawyer = lawyers.find((l) => l.id === lawyerId) || lawyers[0];
     const lawyerServices = services.filter(s => s.lawyerId === lawyer.id);
+
+    const practiceAreasList = Array.isArray(lawyer.practiceAreas) ? lawyer.practiceAreas : (lawyer.practiceAreas ? lawyer.practiceAreas.split(',') : []);
+    const courtsList = Array.isArray(lawyer.courtsPracticedIn) ? lawyer.courtsPracticedIn : (lawyer.courtsPracticedIn ? lawyer.courtsPracticedIn.split(',') : []);
+    const languagesList = Array.isArray(lawyer.languages) ? lawyer.languages : (lawyer.languages ? lawyer.languages.split(',') : []);
 
     return (
       <div style={{ maxWidth: 1180, margin: '48px auto', padding: '0 32px' }}>
         <Button variant="ghost" size="sm" onClick={() => navigate('/marketplace')} className="mb-6">← Back to Advocates Directory</Button>
         
-        {/* Advocate Profile Header Card */}
-        <Card className="mb-10" padding="40px" style={{ backgroundColor: '#FFF', borderRadius: 16 }}>
+        {/* SECTION 1: BASIC IDENTITY HEADER CARD */}
+        <Card className="mb-8" padding="36px" style={{ backgroundColor: '#FFF', borderRadius: 16 }}>
+          <div className="flex items-center gap-2 mb-4 text-caption text-secondary font-semibold uppercase tracking-wider" style={{ fontSize: 11, color: 'var(--color-primary)' }}>
+            <User size={14} /> Section 1: Basic Identity
+          </div>
+
           <div className="flex flex-col md:flex-row gap-8 items-start">
             <img
               src={lawyer.avatar}
               alt={lawyer.name}
               style={{
-                width: 104,
-                height: 104,
+                width: 112,
+                height: 112,
                 borderRadius: '50%',
                 objectFit: 'cover',
                 border: '3px solid var(--color-primary-border)',
@@ -361,32 +369,124 @@ export const PublicMarketplacePage = ({ navigate, lawyerId, serviceId }) => {
                 <h1 className="h2" style={{ margin: 0, fontSize: 28, letterSpacing: '-0.02em' }}>{lawyer.name}</h1>
                 <Badge variant="success" style={{ padding: '6px 14px', fontSize: 13 }}><Check size={14} /> Bar Verified Advocate</Badge>
               </div>
-              <p className="text-body text-secondary mb-3" style={{ fontSize: 15 }}>
-                {lawyer.firm} • Bar Enrolment: <strong>{lawyer.barCouncilNo}</strong> ({lawyer.enrolmentState})
-              </p>
-              <div className="flex flex-wrap items-center gap-5 text-caption text-secondary mb-4" style={{ fontSize: 14 }}>
-                <span><MapPin size={15} style={{ display: 'inline', margin: '0 2px' }} /> {lawyer.city}, {lawyer.state}</span>
-                <span>• {lawyer.experience} Yrs Experience</span>
-                <span>• ★ {lawyer.rating} ({lawyer.reviewCount} Reviews)</span>
-                <span>• {lawyer.qualification}</span>
-              </div>
-              
-              <div className="flex flex-wrap gap-2 mb-6">
-                {lawyer.practiceAreas.map((area, idx) => (
-                  <Badge key={idx} variant="neutral" style={{ padding: '6px 12px' }}>{area}</Badge>
-                ))}
-              </div>
 
-              <p className="text-body mb-8" style={{ fontSize: 15, lineHeight: 1.65, color: 'var(--color-text-primary)' }}>{lawyer.bio}</p>
+              {lawyer.designation && (
+                <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-primary)', marginBottom: 6 }}>
+                  {lawyer.designation}
+                </div>
+              )}
+
+              <p className="text-body text-secondary mb-4" style={{ fontSize: 15 }}>
+                {lawyer.firm ? `${lawyer.firm} • ` : ''}<MapPin size={15} style={{ display: 'inline', margin: '0 2px' }} /> {lawyer.city || 'India'}{lawyer.state ? `, ${lawyer.state}` : ''}
+              </p>
+
+              <div className="flex flex-wrap items-center gap-5 text-caption text-secondary mb-6" style={{ fontSize: 14 }}>
+                <span><strong>Experience:</strong> {lawyer.experience || 0} Years</span>
+                <span>• ★ <strong>{lawyer.rating || 5.0}</strong> ({lawyer.reviewCount || 0} Reviews)</span>
+              </div>
               
-              <div className="p-6 border rounded-lg bg-muted flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6" style={{ borderColor: 'var(--color-border)' }}>
+              <div className="p-5 border rounded-lg bg-muted flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6" style={{ borderColor: 'var(--color-border)' }}>
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', letterSpacing: '0.05em' }}>Direct Consultation Fee</div>
-                  <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--color-primary)', marginTop: 2 }}>₹ {lawyer.consultationFee} <span style={{ fontSize: 13, fontWeight: 400 }} className="text-secondary">/ 45 Min Session</span></div>
+                  <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--color-primary)', marginTop: 2 }}>₹ {lawyer.consultationFee || 2000} <span style={{ fontSize: 13, fontWeight: 400 }} className="text-secondary">/ 45 Min Session</span></div>
                 </div>
                 <Button size="lg" onClick={() => navigate(`/app/marketplace/request/new?lawyerId=${lawyer.id}`)}>
                   Book Direct Consultation →
                 </Button>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* SECTION 2: PROFESSIONAL CREDENTIALS CARD */}
+        <Card className="mb-8" padding="36px" style={{ backgroundColor: '#FFF', borderRadius: 16 }}>
+          <div className="flex items-center gap-2 mb-6 pb-4 border-b text-caption font-semibold uppercase tracking-wider" style={{ fontSize: 11, color: 'var(--color-primary)' }}>
+            <Shield size={14} /> Section 2: Professional Credentials
+          </div>
+
+          <div className="grid grid-2 gap-8 mb-6">
+            <div>
+              <div className="text-caption text-muted font-semibold uppercase tracking-wider mb-2">Practice Areas / Specializations</div>
+              <div className="flex flex-wrap gap-2 mb-6">
+                {practiceAreasList.map((area, idx) => (
+                  <Badge key={idx} variant="neutral" style={{ padding: '6px 12px', fontSize: 13 }}>{area.trim()}</Badge>
+                ))}
+              </div>
+
+              <div className="text-caption text-muted font-semibold uppercase tracking-wider mb-2">Bar Registration Enrolment</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 20 }}>
+                {lawyer.barCouncilNo || 'Verified Enrolment'} {lawyer.enrolmentState ? `(${lawyer.enrolmentState} State Bar Council)` : ''}
+              </div>
+            </div>
+
+            <div>
+              <div className="text-caption text-muted font-semibold uppercase tracking-wider mb-2">Courts Practiced In</div>
+              <div className="flex flex-wrap gap-2 mb-6">
+                {courtsList.length > 0 ? courtsList.map((crt, idx) => (
+                  <Badge key={idx} variant="primary" style={{ padding: '6px 12px', fontSize: 12 }}>{crt.trim()}</Badge>
+                )) : <span className="text-caption text-secondary">Supreme Court & High Courts</span>}
+              </div>
+
+              <div className="text-caption text-muted font-semibold uppercase tracking-wider mb-2">Education & Degrees</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 16 }}>
+                {lawyer.education || lawyer.qualification || 'NLU LL.M / LL.B Degree Holder'}
+              </div>
+
+              {lawyer.certifications && (
+                <>
+                  <div className="text-caption text-muted font-semibold uppercase tracking-wider mb-2">Certifications & Qualifications</div>
+                  <div style={{ fontSize: 14, color: 'var(--color-text-secondary)' }}>
+                    {lawyer.certifications}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </Card>
+
+        {/* SECTION 3: EXPERIENCE & TRACK RECORD CARD */}
+        <Card className="mb-10" padding="36px" style={{ backgroundColor: '#FFF', borderRadius: 16 }}>
+          <div className="flex items-center gap-2 mb-6 pb-4 border-b text-caption font-semibold uppercase tracking-wider" style={{ fontSize: 11, color: 'var(--color-primary)' }}>
+            <FileText size={14} /> Section 3: Experience & Track Record
+          </div>
+
+          <div className="mb-6">
+            <div className="text-caption text-muted font-semibold uppercase tracking-wider mb-2">Professional Bio & Summary</div>
+            <p className="text-body" style={{ fontSize: 15, lineHeight: 1.65, color: 'var(--color-text-primary)', margin: 0 }}>
+              {lawyer.bio || 'Experienced advocate specializing in commercial disputes and advisory.'}
+            </p>
+          </div>
+
+          {lawyer.notableCases && (
+            <div className="mb-6 p-4 border rounded-md" style={{ backgroundColor: 'var(--color-bg-surface-muted)', borderColor: 'var(--color-border)' }}>
+              <div className="text-caption text-muted font-semibold uppercase tracking-wider mb-1">Notable Cases & Matters Handled</div>
+              <p style={{ fontSize: 14, lineHeight: 1.6, margin: 0, color: 'var(--color-text-primary)' }}>
+                {lawyer.notableCases}
+              </p>
+            </div>
+          )}
+
+          <div className="grid grid-3 gap-6 pt-2">
+            {lawyer.achievements && (
+              <div>
+                <div className="text-caption text-muted font-semibold uppercase tracking-wider mb-1">Achievements & Awards</div>
+                <div style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--color-text-primary)' }}>{lawyer.achievements}</div>
+              </div>
+            )}
+
+            {lawyer.publications && (
+              <div>
+                <div className="text-caption text-muted font-semibold uppercase tracking-wider mb-1">Publications & Commentary</div>
+                <div style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--color-text-primary)' }}>{lawyer.publications}</div>
+              </div>
+            )}
+
+            <div>
+              <div className="text-caption text-muted font-semibold uppercase tracking-wider mb-1">Languages Spoken</div>
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {languagesList.map((lang, idx) => (
+                  <Badge key={idx} variant="neutral" size="sm">{lang.trim()}</Badge>
+                ))}
               </div>
             </div>
           </div>
