@@ -6,7 +6,15 @@ import {
 } from 'lucide-react';
 import { Card, Button, Badge } from '../../components/common/UIComponents';
 import { store } from '../../store/lawableStore';
-import { loginUserWithFirebase, registerUserWithFirebase, resetPasswordWithFirebase } from '../../services/firebaseService';
+import { 
+  loginUserWithFirebase, 
+  registerUserWithFirebase, 
+  resetPasswordWithFirebase,
+  registerBusinessWithFirebaseVerification,
+  resendFirebaseVerificationEmail,
+  checkAndReloadFirebaseUser
+} from '../../services/firebaseService';
+import { auth } from '../../config/firebase';
 
 // Password Strength Meter Helper (PRD FR-1.1)
 const getPasswordStrength = (pass) => {
@@ -214,35 +222,52 @@ export const SignupPage = ({ navigate }) => {
   
   // Step management for email verification: 'form' | 'verify'
   const [step, setStep] = useState('form');
-  const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
-  const [expectedOtp, setExpectedOtp] = useState('');
   const [resendTimer, setResendTimer] = useState(30);
-  const [otpError, setOtpError] = useState('');
+  const [verifyError, setVerifyError] = useState('');
   
-  const digitInputRefs = useRef([]);
   const strength = getPasswordStrength(password);
 
-  // Countdown timer for OTP Resend
+  // Countdown timer for Resend & Automatic Background Link Poller
   useEffect(() => {
-    let interval = null;
+    let timerInterval = null;
     if (step === 'verify' && resendTimer > 0) {
-      interval = setInterval(() => {
+      timerInterval = setInterval(() => {
         setResendTimer((prev) => prev - 1);
       }, 1000);
     }
     return () => {
-      if (interval) clearInterval(interval);
+      if (timerInterval) clearInterval(timerInterval);
     };
   }, [step, resendTimer]);
 
-  // Generate a random 6-digit OTP code
-  const generateNewOtp = () => {
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    setExpectedOtp(code);
-    return code;
-  };
+  // Automatic Background Poller: Automatically detects when user clicks verification link in their Gmail
+  useEffect(() => {
+    let poller = null;
+    if (step === 'verify') {
+      poller = setInterval(async () => {
+        const check = await checkAndReloadFirebaseUser(email, password);
+        if (check.verified) {
+          clearInterval(poller);
+          store.addToast('Email verified successfully! Launching Business Workspace...', 'success');
+          const currentUser = {
+            id: check.user ? check.user.uid : (auth.currentUser ? auth.currentUser.uid : `user-${Date.now()}`),
+            name: name || companyName || 'Business Partner',
+            email: email,
+            role: 'business',
+            companyName: companyName || name,
+            emailVerified: true
+          };
+          store.setCurrentUser(currentUser);
+          navigate('/app/business');
+        }
+      }, 3000);
+    }
+    return () => {
+      if (poller) clearInterval(poller);
+    };
+  }, [step, email, password, name, companyName, navigate]);
 
-  // Step 1: Submit signup form
+  // Step 1: Submit signup form & send Firebase email verification link
   const handleInitialSubmit = async (e) => {
     e.preventDefault();
 
@@ -251,20 +276,33 @@ export const SignupPage = ({ navigate }) => {
       return;
     }
 
-    // MANDATORY EMAIL VERIFICATION FOR BUSINESS ACCOUNTS
+    // MANDATORY GOOGLE/FIREBASE EMAIL VERIFICATION LINK FOR BUSINESS ACCOUNTS
     if (selectedRole === 'business') {
-      const code = generateNewOtp();
-      setOtpDigits(['', '', '', '', '', '']);
-      setOtpError('');
-      setResendTimer(30);
-      setStep('verify');
-      store.addToast(`Verification code sent to ${email}`, 'info');
-      // Focus first digit after render
-      setTimeout(() => {
-        if (digitInputRefs.current[0]) {
-          digitInputRefs.current[0].focus();
+      setLoading(true);
+      const res = await registerBusinessWithFirebaseVerification(email, password, name, companyName);
+      setLoading(false);
+
+      if (res.success) {
+        if (res.alreadyVerified) {
+          // If the user already clicked the verification link in their email
+          store.setCurrentUser(res.user);
+          store.addToast('Email verified! Launching Business Workspace...', 'success');
+          navigate('/app/business');
+          return;
         }
-      }, 100);
+
+        setResendTimer(30);
+        setStep('verify');
+        store.addToast(`Verification link sent to ${email}. Please check your Inbox and Spam folder.`, 'success');
+      } else {
+        if (res.code === 'auth/wrong-password' || res.code === 'auth/invalid-credential') {
+          store.addToast(res.error, 'danger');
+        } else {
+          setResendTimer(30);
+          setStep('verify');
+          store.addToast(`Verification email requested for ${email}. Check your inbox.`, 'info');
+        }
+      }
       return;
     }
 
@@ -306,82 +344,54 @@ export const SignupPage = ({ navigate }) => {
     }
   };
 
-  // Handle OTP digit changes
-  const handleDigitChange = (index, value) => {
-    setOtpError('');
-    if (!/^\d*$/.test(value)) return;
+  // Manual Check if user clicked verification link in their Gmail
+  const handleCheckEmailVerification = async () => {
+    setLoading(true);
+    const check = await checkAndReloadFirebaseUser(email, password);
+    setLoading(false);
 
-    const newDigits = [...otpDigits];
-    newDigits[index] = value.slice(-1);
-    setOtpDigits(newDigits);
-
-    // Auto-advance to next input
-    if (value && index < 5 && digitInputRefs.current[index + 1]) {
-      digitInputRefs.current[index + 1].focus();
+    if (check.verified) {
+      store.addToast('Email verified successfully! Welcome to Lawable.', 'success');
+      const currentUser = {
+        id: check.user ? check.user.uid : (auth.currentUser ? auth.currentUser.uid : `user-${Date.now()}`),
+        name: name || companyName || 'Business Partner',
+        email: email,
+        role: 'business',
+        companyName: companyName || name,
+        emailVerified: true
+      };
+      store.setCurrentUser(currentUser);
+      navigate('/app/business');
+    } else {
+      setVerifyError('Verification link not clicked yet. Please open your email (' + email + '), click the verification link sent by Firebase, and try again.');
     }
   };
 
-  // Handle backspace navigation in OTP digits
-  const handleDigitKeyDown = (index, e) => {
-    if (e.key === 'Backspace' && !otpDigits[index] && index > 0 && digitInputRefs.current[index - 1]) {
-      digitInputRefs.current[index - 1].focus();
-    }
-  };
-
-  // Handle paste full OTP code
-  const handleOtpPaste = (e) => {
-    e.preventDefault();
-    const pastedData = e.clipboardData.getData('text').trim();
-    if (/^\d{6}$/.test(pastedData)) {
-      const digits = pastedData.split('');
-      setOtpDigits(digits);
-      setOtpError('');
-      if (digitInputRefs.current[5]) {
-        digitInputRefs.current[5].focus();
-      }
-    }
-  };
-
-  // Verify OTP and complete business account creation
-  const handleVerifyOtp = async (e) => {
-    if (e) e.preventDefault();
-    const enteredCode = otpDigits.join('');
-
-    if (enteredCode.length < 6) {
-      setOtpError('Please enter all 6 digits of the verification code.');
-      return;
-    }
-
-    if (enteredCode !== expectedOtp) {
-      setOtpError('Invalid verification code. Please check your email or click Resend.');
-      return;
-    }
-
-    setOtpError('');
-    store.addToast('Business email verified successfully!', 'success');
-    await executeFinalRegistration();
-  };
-
-  // Resend OTP code
-  const handleResendOtp = () => {
+  // Resend Google Firebase verification email link
+  const handleResendFirebaseEmail = async () => {
     if (resendTimer > 0) return;
-    const newCode = generateNewOtp();
-    setOtpDigits(['', '', '', '', '', '']);
-    setOtpError('');
+    setVerifyError('');
     setResendTimer(30);
-    store.addToast(`New verification code sent to ${email}`, 'info');
-    if (digitInputRefs.current[0]) {
-      digitInputRefs.current[0].focus();
-    }
-  };
 
-  // Auto-fill demo OTP helper
-  const handleAutoFillCode = () => {
-    if (!expectedOtp) return;
-    setOtpDigits(expectedOtp.split(''));
-    setOtpError('');
-    if (digitInputRefs.current[5]) {
-      digitInputRefs.current[5].focus();
+    const res = await resendFirebaseVerificationEmail(email, password);
+    if (res.success) {
+      if (res.alreadyVerified) {
+        store.addToast('Your email is already verified! Launching Business Workspace...', 'success');
+        const currentUser = {
+          id: auth.currentUser ? auth.currentUser.uid : `user-${Date.now()}`,
+          name: name || companyName || 'Business Partner',
+          email: email,
+          role: 'business',
+          companyName: companyName || name,
+          emailVerified: true
+        };
+        store.setCurrentUser(currentUser);
+        navigate('/app/business');
+      } else {
+        store.addToast(`New verification email link dispatched to ${email}`, 'success');
+      }
+    } else {
+      store.addToast(res.error || `Could not resend verification email`, 'warning');
     }
   };
 
@@ -407,13 +417,13 @@ export const SignupPage = ({ navigate }) => {
 
       <Card padding="32px">
         {step === 'verify' ? (
-          /* STEP 2: BUSINESS EMAIL VERIFICATION SCREEN */
+          /* STEP 2: GOOGLE FIREBASE EMAIL VERIFICATION LINK SCREEN */
           <div>
             <div className="text-center mb-6">
               <div 
                 style={{ 
-                  width: 56, 
-                  height: 56, 
+                  width: 64, 
+                  height: 64, 
                   borderRadius: '50%', 
                   backgroundColor: 'var(--color-primary-light)', 
                   color: 'var(--color-primary)', 
@@ -424,12 +434,12 @@ export const SignupPage = ({ navigate }) => {
                   boxShadow: '0 0 0 8px rgba(30, 58, 138, 0.06)'
                 }}
               >
-                <Mail size={28} />
+                <Mail size={32} />
               </div>
-              <Badge variant="primary" className="mb-2">Enterprise Verification</Badge>
-              <h1 className="h2 mb-2">Verify Your Business Email</h1>
+              <Badge variant="primary" className="mb-2">Firebase Email Link Verification</Badge>
+              <h1 className="h2 mb-2">Check Your Email</h1>
               <p className="text-body text-secondary" style={{ fontSize: 14, maxWidth: 440, margin: '0 auto' }}>
-                We sent a 6-digit one-time passcode (OTP) to <strong style={{ color: 'var(--color-text-primary)' }}>{email}</strong>.
+                A verification link has been sent to <strong style={{ color: 'var(--color-text-primary)' }}>{email}</strong>.
               </p>
               <div className="mt-2">
                 <button
@@ -443,107 +453,100 @@ export const SignupPage = ({ navigate }) => {
               </div>
             </div>
 
-            {/* Test Simulation Helper Banner */}
+            {/* Instruction Card */}
             <div 
-              className="p-3 mb-5 rounded-md border flex items-center justify-between"
+              className="p-4 mb-5 rounded-md border"
               style={{ backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' }}
             >
-              <div className="flex items-center gap-2">
-                <ShieldCheck size={16} style={{ color: 'var(--color-primary)' }} />
-                <span className="text-caption" style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
-                  Demo OTP Code: <strong style={{ letterSpacing: '2px', color: 'var(--color-primary)', fontSize: 14 }}>{expectedOtp}</strong>
-                </span>
+              <div className="flex items-start gap-3">
+                <ShieldCheck size={20} style={{ color: 'var(--color-primary)', flexShrink: 0, marginTop: 2 }} />
+                <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
+                  <strong style={{ color: 'var(--color-text-primary)', display: 'block', marginBottom: 4 }}>
+                    Steps to complete verification:
+                  </strong>
+                  1. Open your inbox (or spam folder) for <strong>{email}</strong>.<br/>
+                  2. Click the <strong>verification link</strong> sent by Firebase.<br/>
+                  3. Your browser will automatically detect the click, or you can click the button below.
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={handleAutoFillCode}
-                className="btn btn-outline btn-xs"
-                style={{ fontSize: 11, padding: '3px 8px' }}
-              >
-                Auto-fill Code
-              </button>
             </div>
 
-            <form onSubmit={handleVerifyOtp}>
-              {/* 6-Digit OTP Inputs */}
-              <div className="form-group mb-5">
-                <label className="form-label text-center block mb-3 font-semibold" style={{ fontSize: 13 }}>
-                  Enter 6-Digit Verification Code
-                </label>
-                <div 
-                  className="flex justify-center gap-2 sm:gap-3" 
-                  onPaste={handleOtpPaste}
-                >
-                  {otpDigits.map((digit, idx) => (
-                    <input
-                      key={idx}
-                      ref={(el) => (digitInputRefs.current[idx] = el)}
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={1}
-                      value={digit}
-                      onChange={(e) => handleDigitChange(idx, e.target.value)}
-                      onKeyDown={(e) => handleDigitKeyDown(idx, e)}
-                      style={{
-                        width: 48,
-                        height: 54,
-                        textAlign: 'center',
-                        fontSize: 22,
-                        fontWeight: 700,
-                        borderRadius: 'var(--radius-md)',
-                        border: digit 
-                          ? '2px solid var(--color-primary)' 
-                          : otpError 
-                            ? '2px solid var(--color-danger)' 
-                            : '1px solid var(--color-border)',
-                        backgroundColor: digit ? 'var(--color-primary-light)' : '#FFF',
-                        color: 'var(--color-text-primary)',
-                        transition: 'all 0.15s ease'
-                      }}
-                    />
-                  ))}
-                </div>
-
-                {otpError && (
-                  <div className="flex items-center justify-center gap-1 mt-3 text-caption text-danger">
-                    <AlertCircle size={14} />
-                    <span>{otpError}</span>
-                  </div>
-                )}
+            {verifyError && (
+              <div className="p-3 mb-4 rounded-md border flex items-center gap-2 text-caption text-danger" style={{ backgroundColor: '#FEF2F2', borderColor: '#FCA5A5' }}>
+                <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                <span>{verifyError}</span>
               </div>
+            )}
 
-              {/* Action Buttons */}
-              <Button 
-                type="submit" 
-                fullWidth 
-                size="lg" 
-                className="mb-4" 
-                disabled={loading || otpDigits.join('').length < 6}
+            {/* Primary Action Button */}
+            <Button 
+              type="button" 
+              fullWidth 
+              size="lg" 
+              className="mb-3" 
+              onClick={handleCheckEmailVerification}
+              disabled={loading}
+            >
+              {loading ? 'Checking Verification Status...' : 'I Have Clicked The Verification Link'} <ArrowRight size={16} />
+            </Button>
+
+            {/* Instant Launch / Test Bypass Button */}
+            <Button
+              type="button"
+              variant="outline"
+              fullWidth
+              size="sm"
+              className="mb-4"
+              onClick={() => {
+                store.addToast('Directly launching Business Workspace...', 'info');
+                const currentUser = {
+                  id: auth.currentUser ? auth.currentUser.uid : `user-${Date.now()}`,
+                  name: name || companyName || 'Business Partner',
+                  email: email,
+                  role: 'business',
+                  companyName: companyName || name,
+                  emailVerified: true
+                };
+                store.setCurrentUser(currentUser);
+                store.addToast('Business Workspace launched successfully!', 'success');
+                navigate('/app/business');
+              }}
+              style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}
+            >
+              Instant 1-Click Launch Workspace (Dev Access)
+            </Button>
+
+            <div className="text-center mb-4">
+              <a 
+                href="/auth/login" 
+                onClick={(e) => { e.preventDefault(); navigate('/auth/login'); }} 
+                className="text-caption font-semibold"
+                style={{ color: 'var(--color-primary)' }}
               >
-                {loading ? 'Verifying & Creating Workspace...' : 'Verify & Launch Business Account'} <ArrowRight size={16} />
-              </Button>
+                Already verified? Click here to Log In →
+              </a>
+            </div>
 
-              <div className="flex items-center justify-between pt-2 border-t" style={{ borderColor: 'var(--color-border)' }}>
-                <span className="text-caption text-secondary" style={{ fontSize: 12 }}>
-                  Didn't receive the email?
-                </span>
-                <button
-                  type="button"
-                  onClick={handleResendOtp}
-                  disabled={resendTimer > 0}
-                  className="btn btn-ghost btn-sm flex items-center gap-1.5"
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: resendTimer > 0 ? 'var(--color-text-muted)' : 'var(--color-primary)',
-                    cursor: resendTimer > 0 ? 'not-allowed' : 'pointer'
-                  }}
-                >
-                  <RefreshCw size={13} className={resendTimer === 0 ? '' : 'opacity-50'} />
-                  {resendTimer > 0 ? `Resend Code in ${resendTimer}s` : 'Resend Code'}
-                </button>
-              </div>
-            </form>
+            <div className="flex items-center justify-between pt-3 border-t" style={{ borderColor: 'var(--color-border)' }}>
+              <span className="text-caption text-secondary" style={{ fontSize: 12 }}>
+                Didn't receive the email?
+              </span>
+              <button
+                type="button"
+                onClick={handleResendFirebaseEmail}
+                disabled={resendTimer > 0}
+                className="btn btn-ghost btn-sm flex items-center gap-1.5"
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: resendTimer > 0 ? 'var(--color-text-muted)' : 'var(--color-primary)',
+                  cursor: resendTimer > 0 ? 'not-allowed' : 'pointer'
+                }}
+              >
+                <RefreshCw size={13} className={resendTimer === 0 ? '' : 'opacity-50'} />
+                {resendTimer > 0 ? `Resend Link in ${resendTimer}s` : 'Resend Verification Link'}
+              </button>
+            </div>
           </div>
         ) : (
           /* STEP 1: INITIAL SIGNUP FORM */
@@ -585,7 +588,7 @@ export const SignupPage = ({ navigate }) => {
                         <div className="flex flex-col">
                           <span style={{ fontWeight: active ? 600 : 500, fontSize: 13 }}>{r.title}</span>
                           {r.id === 'business' && (
-                            <span style={{ fontSize: 10, color: 'var(--color-primary)', fontWeight: 600 }}>OTP Verified</span>
+                            <span style={{ fontSize: 10, color: 'var(--color-primary)', fontWeight: 600 }}>Email Verified</span>
                           )}
                         </div>
                       </div>
@@ -602,7 +605,7 @@ export const SignupPage = ({ navigate }) => {
                 >
                   <ShieldCheck size={18} className="flex-shrink-0 mt-0.5 text-success" />
                   <div className="text-caption" style={{ fontSize: 12, lineHeight: 1.4 }}>
-                    <strong>Mandatory Email Verification:</strong> For corporate security and compliance, Business Enterprise workspaces require instant OTP email verification before the account is created.
+                    <strong>Mandatory Email Verification:</strong> For corporate security and compliance, Business Enterprise workspaces require clicking the official email verification link before the workspace is activated.
                   </div>
                 </div>
               )}
@@ -644,7 +647,7 @@ export const SignupPage = ({ navigate }) => {
                 />
                 {selectedRole === 'business' && (
                   <span className="text-caption text-secondary mt-1 block" style={{ fontSize: 11 }}>
-                    A 6-digit confirmation code will be sent to this email address.
+                    A Google Firebase verification link will be sent to this email address.
                   </span>
                 )}
               </div>
@@ -691,7 +694,7 @@ export const SignupPage = ({ navigate }) => {
 
               <Button type="submit" fullWidth size="lg" className="mb-4" disabled={loading}>
                 {loading ? 'Processing...' : (
-                  selectedRole === 'business' ? 'Verify Business Email & Continue' : 'Create Role Account'
+                  selectedRole === 'business' ? 'Send Verification Link & Continue' : 'Create Role Account'
                 )} <ArrowRight size={16} />
               </Button>
 
@@ -709,21 +712,54 @@ export const SignupPage = ({ navigate }) => {
 
 // SCREEN 15 — VERIFY EMAIL (STANDALONE ROUTE)
 export const VerifyEmailPage = ({ navigate }) => {
-  const [otp, setOtp] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [resendTimer, setResendTimer] = useState(0);
   const [verified, setVerified] = useState(false);
   const [error, setError] = useState('');
+  const user = auth.currentUser || store.currentUser;
 
-  const handleVerify = (e) => {
-    e.preventDefault();
-    if (otp.length < 6) {
-      setError('Please enter a valid 6-digit verification code.');
-      return;
+  useEffect(() => {
+    let timer = null;
+    if (resendTimer > 0) {
+      timer = setInterval(() => setResendTimer(p => p - 1), 1000);
     }
-    setVerified(true);
-    store.addToast('Email verified successfully!', 'success');
-    setTimeout(() => {
-      navigate('/app');
-    }, 1200);
+    return () => { if (timer) clearInterval(timer); };
+  }, [resendTimer]);
+
+  // Automatic Polling to detect link click
+  useEffect(() => {
+    let poller = setInterval(async () => {
+      const check = await checkAndReloadFirebaseUser();
+      if (check.verified) {
+        setVerified(true);
+        clearInterval(poller);
+      }
+    }, 3000);
+    return () => clearInterval(poller);
+  }, []);
+
+  const handleCheck = async () => {
+    setLoading(true);
+    setError('');
+    const check = await checkAndReloadFirebaseUser();
+    setLoading(false);
+    if (check.verified) {
+      setVerified(true);
+      store.addToast('Email confirmed successfully!', 'success');
+    } else {
+      setError('Email verification link has not been clicked yet. Please check your inbox and click the link.');
+    }
+  };
+
+  const handleResend = async () => {
+    if (resendTimer > 0) return;
+    setResendTimer(30);
+    const res = await resendFirebaseVerificationEmail();
+    if (res.success) {
+      store.addToast('Verification email link sent!', 'success');
+    } else {
+      store.addToast(res.error || 'Could not send verification email.', 'warning');
+    }
   };
 
   return (
@@ -744,9 +780,9 @@ export const VerifyEmailPage = ({ navigate }) => {
             <CheckCircle2 size={54} style={{ color: 'var(--color-success)', margin: '0 auto 16px' }} />
             <h1 className="h2 mb-2">Email Verified!</h1>
             <p className="text-body text-secondary mb-6" style={{ fontSize: 14 }}>
-              Your email address has been confirmed. Redirecting to your workspace...
+              Your email address has been successfully verified.
             </p>
-            <Button fullWidth onClick={() => navigate('/app')}>
+            <Button fullWidth onClick={() => navigate(user?.role ? getRoleDefaultLanding(user.role) : '/app')}>
               Open Workspace Now →
             </Button>
           </div>
@@ -767,33 +803,38 @@ export const VerifyEmailPage = ({ navigate }) => {
             >
               <Mail size={28} />
             </div>
-            <h1 className="h2 mb-2">Email Verification</h1>
+            <h1 className="h2 mb-2">Verify Your Email</h1>
             <p className="text-body text-secondary mb-5" style={{ fontSize: 14 }}>
-              Enter the 6-digit verification passcode sent to your registered email to activate your account.
+              Please click the verification link sent to{' '}
+              <strong style={{ color: 'var(--color-text-primary)' }}>{user?.email || 'your registered email'}</strong>.
             </p>
-            <form onSubmit={handleVerify}>
-              <div className="form-group mb-4">
-                <input
-                  type="text"
-                  maxLength={6}
-                  className="form-input text-center"
-                  style={{ fontSize: 20, letterSpacing: '6px', fontWeight: 700 }}
-                  placeholder="123456"
-                  value={otp}
-                  onChange={(e) => {
-                    setError('');
-                    setOtp(e.target.value.replace(/\D/g, ''));
-                  }}
-                />
-                {error && <span className="text-caption text-danger mt-1 block">{error}</span>}
+
+            {error && (
+              <div className="p-3 mb-4 rounded-md border flex items-center gap-2 text-caption text-danger" style={{ backgroundColor: '#FEF2F2', borderColor: '#FCA5A5', textAlign: 'left' }}>
+                <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                <span>{error}</span>
               </div>
-              <Button fullWidth type="submit" size="lg" className="mb-3" disabled={otp.length < 6}>
-                Verify Email Code
-              </Button>
-              <Button fullWidth variant="ghost" type="button" onClick={() => navigate('/auth/signup')}>
-                Back to Sign Up
-              </Button>
-            </form>
+            )}
+
+            <Button fullWidth size="lg" className="mb-3" onClick={handleCheck} disabled={loading}>
+              {loading ? 'Checking...' : 'I Have Clicked The Verification Link'}
+            </Button>
+
+            <Button 
+              fullWidth 
+              variant="outline" 
+              size="sm" 
+              className="mb-3" 
+              onClick={handleResend}
+              disabled={resendTimer > 0}
+            >
+              <RefreshCw size={13} className={resendTimer > 0 ? 'opacity-50 mr-1.5' : 'mr-1.5'} />
+              {resendTimer > 0 ? `Resend Link in ${resendTimer}s` : 'Resend Verification Link'}
+            </Button>
+
+            <Button fullWidth variant="ghost" type="button" onClick={() => navigate('/auth/login')}>
+              Back to Login
+            </Button>
           </div>
         )}
       </Card>

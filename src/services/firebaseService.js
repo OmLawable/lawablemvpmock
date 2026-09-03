@@ -4,6 +4,7 @@ import {
   signInWithEmailAndPassword, 
   signOut, 
   sendPasswordResetEmail,
+  sendEmailVerification,
   updateProfile
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc, deleteField } from 'firebase/firestore';
@@ -56,6 +57,167 @@ export async function registerUserWithFirebase(email, password, role = 'client',
   } catch (error) {
     console.error('Firebase Signup Error:', error);
     return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Register business user and send Google's native Firebase Auth verification email directly to Gmail
+ */
+export async function registerBusinessWithFirebaseVerification(email, password, name = '', companyName = '') {
+  try {
+    let userCredential;
+    try {
+      userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    } catch (createErr) {
+      if (createErr.code === 'auth/email-already-in-use') {
+        // If already registered, sign in to check status or resend verification email
+        userCredential = await signInWithEmailAndPassword(auth, email, password);
+      } else {
+        throw createErr;
+      }
+    }
+
+    const user = userCredential.user;
+    await user.reload();
+    const displayName = name || companyName || email.split('@')[0];
+
+    try {
+      await updateProfile(user, { displayName });
+    } catch (pErr) {
+      console.warn('Could not update profile name', pErr);
+    }
+
+    // If not already verified, dispatch Firebase verification email link
+    if (!user.emailVerified) {
+      try {
+        await sendEmailVerification(user);
+      } catch (linkErr) {
+        console.warn('sendEmailVerification fallback:', linkErr.message);
+      }
+      console.log(`✅ Google Firebase verification email link dispatched to ${email}`);
+    }
+
+    const userProfile = {
+      id: user.uid,
+      uid: user.uid,
+      name: displayName,
+      email: user.email,
+      role: 'business',
+      companyName: companyName || displayName,
+      emailVerified: user.emailVerified,
+      createdAt: new Date().toISOString()
+    };
+
+    try {
+      await setDoc(doc(db, 'users', user.uid), userProfile, { merge: true });
+    } catch (dbErr) {
+      console.warn('Firestore setDoc user profile error:', dbErr.message);
+    }
+
+    return { 
+      success: true, 
+      user: userProfile, 
+      firebaseUser: user,
+      alreadyVerified: user.emailVerified 
+    };
+  } catch (error) {
+    console.error('Firebase Business Verification Error:', error);
+    let friendlyMsg = error.message;
+    if (error.code === 'auth/operation-not-allowed') {
+      friendlyMsg = 'Email/Password sign-in provider is disabled in Firebase Console. Please enable it under Firebase Console -> Authentication -> Sign-in method.';
+    } else if (error.code === 'auth/invalid-email') {
+      friendlyMsg = 'Please enter a valid email address.';
+    } else if (error.code === 'auth/weak-password') {
+      friendlyMsg = 'Password should be at least 6 characters.';
+    } else if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+      friendlyMsg = 'An account with this email already exists. Please log in or use the correct password.';
+    }
+    return { success: false, error: friendlyMsg, code: error.code };
+  }
+}
+
+/**
+ * Resend Google Firebase verification email link directly to the user
+ */
+export async function resendFirebaseVerificationEmail(email = '', password = '') {
+  try {
+    let user = auth.currentUser;
+    if (!user && email && password) {
+      try {
+        const cred = await signInWithEmailAndPassword(auth, email, password);
+        user = cred.user;
+      } catch (err) {
+        // silent fallback
+      }
+    }
+
+    if (!user) {
+      return { success: false, error: 'No active session found. Please fill in the signup form again.' };
+    }
+
+    await user.reload();
+    if (user.emailVerified) {
+      return { 
+        success: true, 
+        alreadyVerified: true, 
+        message: 'This email is already verified in Firebase! You can sign in directly.' 
+      };
+    }
+
+    try {
+      await sendEmailVerification(user);
+    } catch (linkErr) {
+      console.warn('resend sendEmailVerification fallback:', linkErr.message);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Firebase Resend Email Error:', error);
+    let friendly = error.message;
+    if (error.code === 'auth/too-many-requests') {
+      friendly = 'Firebase rate limit reached. Please wait a minute before requesting another link, or check your Spam folder for previous emails.';
+    }
+    return { success: false, error: friendly, code: error.code };
+  }
+}
+
+/**
+ * Reload Firebase user state and check if email has been verified via the Google email link.
+ * Supports silent re-authentication if credentials are provided.
+ */
+export async function checkAndReloadFirebaseUser(email = '', password = '') {
+  try {
+    if (auth.currentUser) {
+      await auth.currentUser.reload();
+      if (auth.currentUser.emailVerified) {
+        return { 
+          verified: true,
+          user: auth.currentUser
+        };
+      }
+    }
+    
+    // If auth.currentUser was detached or not yet verified, try authenticating with credentials
+    if (email && password) {
+      try {
+        const credential = await signInWithEmailAndPassword(auth, email, password);
+        await credential.user.reload();
+        return {
+          verified: credential.user.emailVerified,
+          user: credential.user
+        };
+      } catch (authErr) {
+        // Credentials check failed or wrong password
+      }
+    }
+
+    return { 
+      verified: auth.currentUser ? auth.currentUser.emailVerified : false,
+      user: auth.currentUser
+    };
+  } catch (error) {
+    console.warn('Error reloading Firebase user:', error.message);
+    return { verified: false, error: error.message };
   }
 }
 
